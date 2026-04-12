@@ -64,10 +64,10 @@ export const NODE_SCHEMAS: Record<string, NodeSchema> = {
     },
   },
   voiceover_generator: {
-    required: ['text', 'voice', 'model'],
+    required: ['text'],
     defaults: {
       voice: 'Rachel',
-      model: 'fal-ai/elevenlabs/text-to-dialogue/eleven-v3',
+      model: 'fal-ai/elevenlabs/tts',
     },
   },
   music_generator: {
@@ -84,7 +84,7 @@ export const NODE_SCHEMAS: Record<string, NodeSchema> = {
       projectName: 'Video Project',
       photoModel: 'fal-ai/nano-banana-2',
       videoModel: 'fal-ai/kling-video/o3/pro/image-to-video',
-      voiceModel: 'fal-ai/elevenlabs/text-to-dialogue/eleven-v3',
+      voiceModel: 'fal-ai/elevenlabs/tts',
     },
     runtimeFills: ['cloudinaryFolder'],
   },

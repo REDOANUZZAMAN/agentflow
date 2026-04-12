@@ -393,32 +393,90 @@ async function executeVideoGenerator(node: WorkflowNode, ctx: ExecutionContext) 
 async function executeVoiceoverGenerator(node: WorkflowNode, ctx: ExecutionContext) {
   initFal();
   const { text, voice, model } = node.data.config;
-  const falModel = model || FAL_MODELS.VOICE_DIALOGUE;
+  const voiceText = text || 'Hello, welcome to the video.';
+  
+  // Determine which model to use
+  const isDialogueModel = model && model.includes('dialogue');
+  const falModel = model || FAL_MODELS.VOICE_TTS; // Default to simple TTS, not dialogue
 
-  ctx.emit({ type: 'log', nodeId: node.id, data: { message: `🗣️ Generating voiceover...` } });
+  ctx.emit({ type: 'log', nodeId: node.id, data: { 
+    message: `🗣️ Generating voiceover via ${falModel}... Text: "${voiceText.substring(0, 80)}${voiceText.length > 80 ? '...' : ''}"` 
+  }});
 
-  try {
-    const result = await fal.subscribe(falModel, {
-      input: {
-        text: text || 'Hello, welcome to the video.',
-        voice: voice || 'en-US-1',
-      },
-    });
-
-    const audioUrl = (result as any).data?.audio?.url || (result as any).audio?.url || (result as any).data?.audio_url?.url;
-    if (!audioUrl) {
-      ctx.emit({ type: 'log', nodeId: node.id, data: { message: `⚠️ No audio URL returned, skipping voiceover` } });
-      return { _nodeType: 'voiceover_generator', audioUrl: null, cost: 0 };
-    }
-
-    const cldResult = await uploadToCloudinary(audioUrl, `agentflow/${ctx.projectId}/audio`, `voiceover_${Date.now()}`, 'video');
-    ctx.emit({ type: 'asset_created', nodeId: node.id, data: { type: 'audio', url: cldResult.secure_url } });
-
-    return { _nodeType: 'voiceover_generator', audioUrl: cldResult.secure_url, cloudinaryId: cldResult.public_id, cost: calcRealCost(falModel) };
-  } catch (err: any) {
-    ctx.emit({ type: 'log', nodeId: node.id, data: { message: `⚠️ Voiceover failed: ${err.message}` } });
-    return { _nodeType: 'voiceover_generator', audioUrl: null, cost: 0 };
+  // Build input based on model type
+  let input: any;
+  if (isDialogueModel) {
+    // Dialogue model expects script array: [{ voice: "...", text: "..." }]
+    input = {
+      script: [{ voice: voice || 'alloy', text: voiceText }],
+    };
+    ctx.emit({ type: 'log', nodeId: node.id, data: { message: `📝 Using dialogue format: script array with voice "${voice || 'alloy'}"` } });
+  } else {
+    // Standard TTS: text + voice
+    input = {
+      text: voiceText,
+      ...(voice ? { voice: voice } : {}),
+    };
+    ctx.emit({ type: 'log', nodeId: node.id, data: { message: `📝 Using TTS format: text + voice "${voice || 'default'}"` } });
   }
+
+  ctx.emit({ type: 'api_call', nodeId: node.id, data: { service: 'fal.ai', model: falModel, input } });
+
+  let result: any;
+  try {
+    result = await fal.subscribe(falModel, { input });
+  } catch (err: any) {
+    ctx.emit({ type: 'log', nodeId: node.id, data: { 
+      message: `❌ fal.ai voiceover FAILED. Model: ${falModel}, Input: ${JSON.stringify(input)}`,
+      error: err.message,
+      body: err.body || null,
+    }});
+    throw new Error(`Voiceover generation failed (${falModel}): ${err.message}`);
+  }
+
+  // Log raw response structure for debugging
+  const resultData = (result as any).data || result;
+  ctx.emit({ type: 'log', nodeId: node.id, data: { 
+    message: `📦 Raw response keys: ${JSON.stringify(Object.keys(resultData))}`,
+    rawKeys: Object.keys(resultData),
+  }});
+
+  // Try ALL possible audio URL locations in the response
+  const audioUrl = 
+    resultData?.audio?.url ||          // { audio: { url: "..." } }
+    resultData?.audio_url?.url ||      // { audio_url: { url: "..." } }
+    resultData?.audio_url ||           // { audio_url: "..." }
+    resultData?.audio ||               // { audio: "..." } (direct string)
+    resultData?.output?.url ||         // { output: { url: "..." } }
+    resultData?.url ||                 // { url: "..." }
+    (typeof resultData === 'string' ? resultData : null);  // direct string
+
+  if (!audioUrl || typeof audioUrl !== 'string') {
+    ctx.emit({ type: 'log', nodeId: node.id, data: { 
+      message: `❌ No audio URL found in response! Full response: ${JSON.stringify(resultData).substring(0, 500)}`,
+    }});
+    throw new Error(`Voiceover: no audio URL in fal.ai response. Response keys: ${Object.keys(resultData).join(', ')}`);
+  }
+
+  ctx.emit({ type: 'log', nodeId: node.id, data: { message: `✅ Got audio URL: ${audioUrl.substring(0, 80)}...` } });
+  ctx.emit({ type: 'log', nodeId: node.id, data: { message: `📤 Uploading voiceover to Cloudinary...` } });
+
+  const cldResult = await uploadToCloudinary(
+    audioUrl, 
+    `agentflow/${ctx.executionId}/audio`, 
+    `voiceover_${Date.now()}`, 
+    'video'  // Cloudinary uses 'video' resource type for audio
+  );
+  
+  ctx.emit({ type: 'asset_created', nodeId: node.id, data: { type: 'audio', url: cldResult.secure_url } });
+
+  return { 
+    _nodeType: 'voiceover_generator', 
+    audioUrl: cldResult.secure_url, 
+    cloudinaryId: cldResult.public_id, 
+    model: falModel,
+    cost: calcRealCost(falModel),
+  };
 }
 
 async function executeImageGen(node: WorkflowNode, ctx: ExecutionContext) {

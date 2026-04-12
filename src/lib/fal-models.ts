@@ -16,6 +16,7 @@ export const FAL_MODELS = {
   VIDEO_KLING_O3_R2V: 'fal-ai/kling-video/o3/pro/reference-to-video',
 
   // ─── Audio ─────────────────────────────────────────────────────
+  VOICE_TTS: 'fal-ai/elevenlabs/tts',
   VOICE_DIALOGUE: 'fal-ai/elevenlabs/text-to-dialogue/eleven-v3',
   MUSIC: 'fal-ai/elevenlabs/music',
 } as const;
@@ -92,10 +93,17 @@ export const VIDEO_MODEL_CATALOG = [
 
 export const VOICE_MODEL_CATALOG = [
   {
+    id: FAL_MODELS.VOICE_TTS,
+    name: 'ElevenLabs TTS',
+    label: '🗣️ ElevenLabs TTS (default)',
+    description: 'Simple text-to-speech. Best for narration and voiceovers.',
+    cost: '$0.03',
+  },
+  {
     id: FAL_MODELS.VOICE_DIALOGUE,
     name: 'ElevenLabs v3 Dialogue',
-    label: '🗣️ ElevenLabs v3 Dialogue (default)',
-    description: 'High-quality text-to-dialogue with voice selection.',
+    label: '🎭 ElevenLabs v3 Dialogue (multi-speaker)',
+    description: 'Multi-speaker dialogue with script format.',
     cost: '$0.05',
   },
 ] as const;
@@ -121,6 +129,7 @@ export function getModelCost(model: string): number {
     [FAL_MODELS.VIDEO_KLING_O3_I2V]: 0.95,
     [FAL_MODELS.VIDEO_KLING_O3_T2V]: 0.95,
     [FAL_MODELS.VIDEO_KLING_O3_R2V]: 1.20,
+    [FAL_MODELS.VOICE_TTS]: 0.03,
     [FAL_MODELS.VOICE_DIALOGUE]: 0.05,
     [FAL_MODELS.MUSIC]: 0.10,
   };

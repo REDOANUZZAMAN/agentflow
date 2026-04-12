@@ -160,29 +160,69 @@ async function executePhotoGenerator(node: WorkflowNode, ctx: ExecutionContext) 
   // CONNECTIONS ARE THE ONLY SOURCE OF TRUTH for element references
   // Never read from config.elementRefs — only from upstream graph edges
   const elementRefs = getUpstream(ctx, node.id, 'element_reference');
+  // Also check ALL upstream outputs (in case elements are connected indirectly via script_parser etc.)
+  if (elementRefs.length === 0) {
+    const allUpstream = getUpstream(ctx, node.id);
+    for (const up of allUpstream) {
+      if (up.assets?.elements) {
+        elementRefs.push(...up.assets.elements);
+      }
+    }
+  }
+  // Last resort: scan ALL completed outputs for element_reference nodes
+  if (elementRefs.length === 0) {
+    for (const [, output] of ctx.nodeOutputs) {
+      if (output._nodeType === 'element_reference' && output.imageUrl) {
+        elementRefs.push(output);
+      }
+    }
+  }
+  
   const hasRefs = elementRefs.length > 0;
   const referenceUrls = elementRefs.map((r: any) => r.imageUrl).filter(Boolean);
+  const elementDescriptions = elementRefs.map((r: any) => r.elementName || '').filter(Boolean);
   
   ctx.emit({ type: 'log', nodeId: node.id, data: { 
-    message: `📸 Found ${elementRefs.length} connected element refs: ${elementRefs.map((r: any) => r.elementName || 'unnamed').join(', ') || 'none'}` 
+    message: `📸 Found ${elementRefs.length} element refs: ${elementDescriptions.join(', ') || 'none'} | URLs: ${referenceUrls.length}` 
   }});
   
-  const falModel = model || pickImageModel(hasRefs, elementRefs.length, false);
+  // CRITICAL: If element refs are connected, ALWAYS use an edit model
+  // Even if the AI agent hardcoded a non-edit model in config
+  let falModel: string;
+  if (hasRefs && referenceUrls.length > 0) {
+    // Force edit model regardless of what config.model says
+    falModel = pickImageModel(true, elementRefs.length, false);
+    if (model && model !== falModel) {
+      ctx.emit({ type: 'log', nodeId: node.id, data: { 
+        message: `🔄 Auto-upgrading model: ${model} → ${falModel} (element refs require edit model)` 
+      }});
+    }
+  } else {
+    falModel = model || pickImageModel(false, 0, false);
+  }
+  
   // Accept both snake_case and camelCase config keys
   const sceneNum = scene_number || sceneNumber || 1;
   const shotNum = shot_number || shotNumber || 1;
-  const finalPrompt = prompt || 'A beautiful scene';
+  
+  // Enrich prompt with element descriptions for better results
+  let finalPrompt = prompt || 'A beautiful scene';
+  if (hasRefs && elementDescriptions.length > 0) {
+    // If the prompt doesn't already mention the elements, add them
+    const elementsNotInPrompt = elementDescriptions.filter(
+      (name: string) => !finalPrompt.toLowerCase().includes(name.toLowerCase())
+    );
+    if (elementsNotInPrompt.length > 0) {
+      finalPrompt = `${finalPrompt}. Featuring: ${elementsNotInPrompt.join(', ')}`;
+      ctx.emit({ type: 'log', nodeId: node.id, data: { 
+        message: `📝 Enriched prompt with element names: ${elementsNotInPrompt.join(', ')}` 
+      }});
+    }
+  }
 
   // Validate prompt
   if (!finalPrompt || finalPrompt.trim().length < 3) {
     throw new Error(`Photo prompt is empty or too short: "${finalPrompt}". Provide a descriptive prompt.`);
-  }
-  
-  // Validate: edit model requires connected element refs
-  if (falModel.includes('/edit') && referenceUrls.length === 0) {
-    ctx.emit({ type: 'log', nodeId: node.id, data: { 
-      message: `⚠️ Edit model ${falModel} requires connected Element Reference nodes but found none. Falling back to non-edit model.` 
-    }});
   }
   
   ctx.emit({ type: 'log', nodeId: node.id, data: { message: `📸 Generating photo for Scene ${sceneNum}, Shot ${shotNum} via ${falModel}...` } });
@@ -198,9 +238,15 @@ async function executePhotoGenerator(node: WorkflowNode, ctx: ExecutionContext) 
   
   // Pass element reference images to fal.ai for /edit models
   if (referenceUrls.length > 0 && falModel.includes('/edit')) {
+    // fal.ai edit models accept image_urls (array of reference images)
     input.image_urls = referenceUrls;
     ctx.emit({ type: 'log', nodeId: node.id, data: { 
-      message: `🔗 Passing ${referenceUrls.length} reference image(s) to ${falModel}` 
+      message: `🔗 Passing ${referenceUrls.length} reference image(s) to ${falModel}: ${referenceUrls.map((u: string) => u.substring(0, 60) + '...').join(', ')}` 
+    }});
+  } else if (referenceUrls.length > 0) {
+    // Non-edit model but refs exist — try passing as image_url anyway
+    ctx.emit({ type: 'log', nodeId: node.id, data: { 
+      message: `⚠️ Model ${falModel} is not an edit model but ${referenceUrls.length} refs are available. Refs will be in prompt text only.` 
     }});
   }
 

@@ -420,6 +420,9 @@ export function createNode(type: NodeType, config: Record<string, unknown> = {},
   nodeCounter++;
   const id = `node_${Date.now()}_${nodeCounter}`;
 
+  // Apply defaults from node-defaults schema
+  const mergedConfig = applyDefaults(type, config);
+
   return {
     id,
     type: 'workflowNode',
@@ -428,7 +431,7 @@ export function createNode(type: NodeType, config: Record<string, unknown> = {},
       type,
       label: meta.label,
       emoji: meta.emoji,
-      config,
+      config: mergedConfig,
       status: 'idle',
     },
   };

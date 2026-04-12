@@ -659,18 +659,44 @@ async function executeFinalVideoCompiler(node: WorkflowNode, ctx: ExecutionConte
     try {
       ctx.emit({ type: 'log', nodeId: node.id, data: { message: `🔊 Overlaying voiceover audio onto video...` } });
       
-      // Cloudinary: overlay audio on video using l_video transformation
+      // Cloudinary: overlay audio on video — use separate transformation steps (slash not comma)
       const audioOverlayId = audioId.replace(/\//g, ':');
-      const videoWithAudioUrl = `https://res.cloudinary.com/${cloudName}/video/upload/l_video:${audioOverlayId},fl_layer_apply/${splicedVideoId}.mp4`;
+      // Method 1: Two-step transformation (layer + apply as separate steps)
+      const videoWithAudioUrl = `https://res.cloudinary.com/${cloudName}/video/upload/l_video:${audioOverlayId}/fl_layer_apply/${splicedVideoId}.mp4`;
       
-      ctx.emit({ type: 'log', nodeId: node.id, data: { message: `📎 Audio overlay URL: ${videoWithAudioUrl.substring(0, 120)}...` } });
+      ctx.emit({ type: 'log', nodeId: node.id, data: { message: `📎 Audio overlay URL: ${videoWithAudioUrl.substring(0, 150)}...` } });
       
-      const finalResult = await cld.uploader.upload(videoWithAudioUrl, {
-        folder,
-        public_id: 'final_with_audio',
-        resource_type: 'video',
-        overwrite: true,
-      });
+      let finalResult: any;
+      try {
+        finalResult = await cld.uploader.upload(videoWithAudioUrl, {
+          folder,
+          public_id: 'final_with_audio',
+          resource_type: 'video',
+          overwrite: true,
+        });
+      } catch (overlayErr: any) {
+        // Method 2: Fallback — use Cloudinary SDK explicit API with eager transformation
+        ctx.emit({ type: 'log', nodeId: node.id, data: { message: `⚠️ URL overlay failed (${overlayErr.message}), trying SDK approach...` } });
+        
+        finalResult = await cld.uploader.explicit(splicedVideoId, {
+          type: 'upload',
+          resource_type: 'video',
+          eager: [{ overlay: `video:${audioOverlayId}`, flags: 'layer_apply' }],
+          eager_async: false,
+          overwrite: true,
+        });
+        
+        // If eager worked, upload the transformed version
+        if (finalResult?.eager?.[0]?.secure_url) {
+          const eagerUrl = finalResult.eager[0].secure_url;
+          finalResult = await cld.uploader.upload(eagerUrl, {
+            folder,
+            public_id: 'final_with_audio',
+            resource_type: 'video',
+            overwrite: true,
+          });
+        }
+      }
       
       finalUrl = finalResult.secure_url;
       finalPublicId = finalResult.public_id;

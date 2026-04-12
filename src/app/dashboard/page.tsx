@@ -4,10 +4,16 @@ import React, { useEffect, useState } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import {
+  Zap, Plus, Home, Layers, BookOpen, LayoutTemplate, LogOut, Menu,
+  MoreVertical, Pencil, Copy, Trash2, ClipboardList, Activity, Play,
+  BarChart3, Laugh, Newspaper, AtSign, Search, Clapperboard, Camera,
+  Bot, Package, ChevronRight, Clock, Workflow
+} from 'lucide-react';
 
 const supabase = createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 
-interface Workflow {
+interface WorkflowItem {
   id: string;
   name: string;
   emoji: string;
@@ -20,13 +26,23 @@ interface Workflow {
   created_at: string;
 }
 
+// Template icons mapping — premium Lucide icons instead of emojis
+const TEMPLATE_ICONS: Record<string, React.ReactNode> = {
+  'daily-joke': <Laugh className="w-5 h-5 text-amber-400" />,
+  'news-summary': <Newspaper className="w-5 h-5 text-blue-400" />,
+  'auto-post-x': <AtSign className="w-5 h-5 text-sky-400" />,
+  'web-monitor': <Search className="w-5 h-5 text-emerald-400" />,
+  'script-video': <Clapperboard className="w-5 h-5 text-rose-400" />,
+  'instagram-reels': <Camera className="w-5 h-5 text-pink-400" />,
+};
+
 const TEMPLATES = [
-  { emoji: '😂', name: 'Daily joke by email', prompt: 'Make me an agent that sends me a funny joke by email every morning' },
-  { emoji: '📰', name: 'News summary', prompt: 'Build an agent that writes a daily news summary and emails it to me' },
-  { emoji: '🐦', name: 'Auto-post to X', prompt: 'Create an agent that generates engaging tweets and posts them to X daily' },
-  { emoji: '🔍', name: 'Web monitor', prompt: 'Build an agent that monitors a webpage for changes and alerts me' },
-  { emoji: '🎬', name: 'Script to video', prompt: 'Create a video pipeline that turns a script into a cinematic short film' },
-  { emoji: '📸', name: 'Instagram reels', prompt: 'Build an agent that creates and posts Instagram reels automatically' },
+  { id: 'daily-joke', name: 'Daily joke by email', prompt: 'Make me an agent that sends me a funny joke by email every morning' },
+  { id: 'news-summary', name: 'News summary', prompt: 'Build an agent that writes a daily news summary and emails it to me' },
+  { id: 'auto-post-x', name: 'Auto-post to X', prompt: 'Create an agent that generates engaging tweets and posts them to X daily' },
+  { id: 'web-monitor', name: 'Web monitor', prompt: 'Build an agent that monitors a webpage for changes and alerts me' },
+  { id: 'script-video', name: 'Script to video', prompt: 'Create a video pipeline that turns a script into a cinematic short film' },
+  { id: 'instagram-reels', name: 'Instagram reels', prompt: 'Build an agent that creates and posts Instagram reels automatically' },
 ];
 
 function getGreeting() {
@@ -39,7 +55,7 @@ function getGreeting() {
 export default function DashboardPage() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
-  const [workflows, setWorkflows] = useState<Workflow[]>([]);
+  const [workflows, setWorkflows] = useState<WorkflowItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -60,13 +76,13 @@ export default function DashboardPage() {
 
   const createWorkflow = async () => {
     if (!user) return;
-    const { data } = await supabase.from('workflows').insert({ user_id: user.id, name: 'Untitled Workflow', emoji: '🤖', status: 'draft', nodes: [], edges: [] }).select().single();
+    const { data } = await supabase.from('workflows').insert({ user_id: user.id, name: 'Untitled Workflow', emoji: 'bot', status: 'draft', nodes: [], edges: [] }).select().single();
     if (data) router.push(`/builder/${data.id}`);
   };
 
   const createFromTemplate = async (t: typeof TEMPLATES[0]) => {
     if (!user) return;
-    const { data } = await supabase.from('workflows').insert({ user_id: user.id, name: t.name, emoji: t.emoji, status: 'draft', nodes: [], edges: [] }).select().single();
+    const { data } = await supabase.from('workflows').insert({ user_id: user.id, name: t.name, emoji: t.id, status: 'draft', nodes: [], edges: [] }).select().single();
     if (data) router.push(`/builder/${data.id}?prompt=${encodeURIComponent(t.prompt)}`);
   };
 
@@ -78,7 +94,7 @@ export default function DashboardPage() {
     setRenamingId(null);
   };
 
-  const handleDuplicate = async (wf: Workflow) => {
+  const handleDuplicate = async (wf: WorkflowItem) => {
     if (!user) return;
     const { data } = await supabase.from('workflows').insert({ user_id: user.id, name: `${wf.name} (copy)`, emoji: wf.emoji, status: 'draft', nodes: wf.nodes, edges: wf.edges }).select().single();
     if (data) setWorkflows(prev => [data, ...prev]);
@@ -110,6 +126,19 @@ export default function DashboardPage() {
   const activeCount = workflows.filter(w => w.status === 'active').length;
   const totalRuns = workflows.reduce((s, w) => s + (w.run_count || 0), 0);
 
+  // Map workflow emoji field to a Lucide icon
+  const getWorkflowIcon = (emoji: string) => {
+    if (TEMPLATE_ICONS[emoji]) return TEMPLATE_ICONS[emoji];
+    return <Bot className="w-4 h-4 text-[var(--primary)]" />;
+  };
+
+  const NAV_ITEMS = [
+    { icon: <Home className="w-4 h-4" />, label: 'Home', active: true, href: '#' },
+    { icon: <Workflow className="w-4 h-4" />, label: 'Workflows', href: '#workflows' },
+    { icon: <BookOpen className="w-4 h-4" />, label: 'Library', href: '/library' },
+    { icon: <LayoutTemplate className="w-4 h-4" />, label: 'Templates', href: '#templates' },
+  ];
+
   return (
     <div className="min-h-screen flex bg-[var(--background)]">
       {/* ─── Sidebar ─────────────────────────────────────────────── */}
@@ -117,21 +146,16 @@ export default function DashboardPage() {
         {/* Logo */}
         <div className="h-14 flex items-center gap-2.5 px-4 border-b border-[var(--border-subtle)]">
           <div className="w-7 h-7 rounded-lg bg-[var(--primary)] flex items-center justify-center flex-shrink-0">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+            <Zap className="w-3.5 h-3.5 text-white" strokeWidth={2.5} />
           </div>
           {!sidebarCollapsed && <span className="text-[14px] font-semibold tracking-tight">AgentFlow</span>}
         </div>
 
         {/* Nav */}
         <nav className="flex-1 py-3 px-2 space-y-0.5">
-          {[
-            { icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6', label: 'Home', active: true },
-            { icon: 'M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6z', label: 'Workflows', href: '#workflows' },
-            { icon: 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10', label: 'Library', href: '/library' },
-            { icon: 'M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5z', label: 'Templates', href: '#templates' },
-          ].map((item, i) => (
-            <a key={i} href={item.href || '#'} className={`flex items-center gap-3 px-3 py-2 rounded-md text-[13px] transition-colors ${item.active ? 'bg-[var(--primary)]/10 text-[var(--primary)]' : 'text-[var(--text-secondary)] hover:bg-[rgba(255,255,255,0.04)] hover:text-[var(--foreground)]'}`}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d={item.icon}/></svg>
+          {NAV_ITEMS.map((item, i) => (
+            <a key={i} href={item.href} className={`flex items-center gap-3 px-3 py-2 rounded-md text-[13px] transition-colors ${item.active ? 'bg-[var(--primary)]/10 text-[var(--primary)]' : 'text-[var(--text-secondary)] hover:bg-[rgba(255,255,255,0.04)] hover:text-[var(--foreground)]'}`}>
+              {item.icon}
               {!sidebarCollapsed && item.label}
               {item.active && !sidebarCollapsed && <div className="ml-auto w-1 h-4 rounded-full bg-[var(--primary)]" />}
             </a>
@@ -142,16 +166,16 @@ export default function DashboardPage() {
         <div className="border-t border-[var(--border-subtle)] p-3">
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-full bg-[var(--primary)]/20 flex items-center justify-center flex-shrink-0">
-              <span className="text-tiny text-[var(--primary)]">{user?.email?.[0]?.toUpperCase() || '?'}</span>
+              <span className="text-[11px] font-medium text-[var(--primary)]">{user?.email?.[0]?.toUpperCase() || '?'}</span>
             </div>
             {!sidebarCollapsed && (
               <div className="flex-1 min-w-0">
-                <p className="text-tiny text-[var(--foreground)] truncate">{user?.email || 'Loading...'}</p>
+                <p className="text-[11px] font-medium text-[var(--foreground)] truncate">{user?.email || 'Loading...'}</p>
               </div>
             )}
             {!sidebarCollapsed && (
               <button onClick={handleSignOut} className="text-[var(--text-muted)] hover:text-[var(--foreground)] transition-colors" title="Sign out">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4m7 14 5-5-5-5m5 5H9"/></svg>
+                <LogOut className="w-3.5 h-3.5" />
               </button>
             )}
           </div>
@@ -163,12 +187,12 @@ export default function DashboardPage() {
         {/* Top bar */}
         <div className="h-14 border-b border-[var(--border-subtle)] flex items-center px-8">
           <button onClick={() => setSidebarCollapsed(!sidebarCollapsed)} className="mr-4 text-[var(--text-muted)] hover:text-[var(--foreground)] transition-colors">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+            <Menu className="w-4 h-4" />
           </button>
           <span className="text-small text-[var(--text-muted)]">Dashboard</span>
           <div className="ml-auto flex items-center gap-3">
             <button onClick={createWorkflow} className="btn btn-primary btn-sm">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              <Plus className="w-3.5 h-3.5" />
               New workflow
             </button>
           </div>
@@ -184,15 +208,15 @@ export default function DashboardPage() {
           {/* Stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
             {[
-              { label: 'Workflows', value: workflows.length, icon: '📋' },
-              { label: 'Active', value: activeCount, icon: '🟢' },
-              { label: 'Total runs', value: totalRuns, icon: '▶️' },
-              { label: 'This month', value: workflows.filter(w => w.last_run_at && new Date(w.last_run_at).getMonth() === new Date().getMonth()).length + ' runs', icon: '📊' },
+              { label: 'Workflows', value: workflows.length, icon: <ClipboardList className="w-4 h-4 text-[var(--primary)]" /> },
+              { label: 'Active', value: activeCount, icon: <Activity className="w-4 h-4 text-emerald-400" /> },
+              { label: 'Total runs', value: totalRuns, icon: <Play className="w-4 h-4 text-blue-400" /> },
+              { label: 'This month', value: workflows.filter(w => w.last_run_at && new Date(w.last_run_at).getMonth() === new Date().getMonth()).length + ' runs', icon: <BarChart3 className="w-4 h-4 text-amber-400" /> },
             ].map((s, i) => (
               <div key={i} className="card p-4">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-tiny text-[var(--text-muted)] uppercase tracking-wider">{s.label}</span>
-                  <span className="text-base">{s.icon}</span>
+                  <div className="w-8 h-8 rounded-lg bg-[var(--bg-sunken)] flex items-center justify-center">{s.icon}</div>
                 </div>
                 <p className="text-h3 text-[var(--foreground)]">{s.value}</p>
               </div>
@@ -205,7 +229,9 @@ export default function DashboardPage() {
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               {TEMPLATES.map((t, i) => (
                 <button key={i} onClick={() => createFromTemplate(t)} className="card card-interactive p-4 text-left group">
-                  <span className="text-xl mb-2 block">{t.emoji}</span>
+                  <div className="w-10 h-10 rounded-lg bg-[var(--bg-sunken)] border border-[var(--border-subtle)] flex items-center justify-center mb-3">
+                    {TEMPLATE_ICONS[t.id]}
+                  </div>
                   <p className="text-body font-medium text-[var(--foreground)]">{t.name}</p>
                   <p className="text-tiny text-[var(--text-muted)] mt-1 line-clamp-2">{t.prompt}</p>
                 </button>
@@ -231,25 +257,27 @@ export default function DashboardPage() {
               </div>
             ) : workflows.length === 0 ? (
               <div className="card text-center py-16">
-                <div className="text-4xl mb-4">🤖</div>
+                <div className="w-14 h-14 rounded-2xl bg-[var(--bg-sunken)] border border-[var(--border-subtle)] flex items-center justify-center mx-auto mb-4">
+                  <Bot className="w-7 h-7 text-[var(--primary)]" />
+                </div>
                 <h3 className="text-h3 text-[var(--foreground)] mb-2">No workflows yet</h3>
                 <p className="text-body text-[var(--text-secondary)] mb-6">Create your first agent or pick a template above.</p>
                 <button onClick={createWorkflow} className="btn btn-primary">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                  <Plus className="w-3.5 h-3.5" />
                   New workflow
                 </button>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {workflows.map(wf => (
-                  <div key={wf.id} className="card card-interactive relative group" onClick={() => menuOpen !== wf.id && renamingId !== wf.id && router.push(`/builder/${wf.id}`)}>
+                  <div key={wf.id} className="card card-interactive relative group cursor-pointer" onClick={() => menuOpen !== wf.id && renamingId !== wf.id && router.push(`/builder/${wf.id}`)}>
                     {/* Canvas mini preview */}
                     <div className="h-24 rounded-md bg-[var(--bg-sunken)] border border-[var(--border-subtle)] mb-4 flex items-center justify-center overflow-hidden">
                       {wf.nodes.length > 0 ? (
                         <div className="flex gap-1.5 items-center">
                           {wf.nodes.slice(0, 5).map((n: any, i: number) => (
-                            <div key={i} className="w-8 h-8 rounded bg-[var(--bg-elevated)] border border-[var(--border-subtle)] flex items-center justify-center text-[10px]" title={n.data?.label}>
-                              {n.data?.emoji || '📦'}
+                            <div key={i} className="w-8 h-8 rounded bg-[var(--bg-elevated)] border border-[var(--border-subtle)] flex items-center justify-center" title={n.data?.label}>
+                              <Package className="w-3 h-3 text-[var(--text-muted)]" />
                             </div>
                           ))}
                           {wf.nodes.length > 5 && <span className="text-tiny text-[var(--text-muted)]">+{wf.nodes.length - 5}</span>}
@@ -273,36 +301,42 @@ export default function DashboardPage() {
                             onClick={e => e.stopPropagation()}
                           />
                         ) : (
-                          <h3 className="text-body font-medium text-[var(--foreground)] truncate">
-                            <span className="mr-1.5">{wf.emoji}</span>{wf.name}
+                          <h3 className="text-body font-medium text-[var(--foreground)] truncate flex items-center gap-2">
+                            {getWorkflowIcon(wf.emoji)}
+                            {wf.name}
                           </h3>
                         )}
                         <div className="flex items-center gap-3 mt-1.5">
-                          <span className="text-tiny text-[var(--text-muted)]">{wf.nodes.length} nodes</span>
-                          <span className="text-tiny text-[var(--text-muted)]">{formatDate(wf.updated_at)}</span>
-                          {wf.run_count > 0 && <span className="text-tiny text-[var(--text-muted)]">{wf.run_count} runs</span>}
+                          <span className="flex items-center gap-1 text-tiny text-[var(--text-muted)]">
+                            <Layers className="w-3 h-3" /> {wf.nodes.length} nodes
+                          </span>
+                          <span className="flex items-center gap-1 text-tiny text-[var(--text-muted)]">
+                            <Clock className="w-3 h-3" /> {formatDate(wf.updated_at)}
+                          </span>
+                          {wf.run_count > 0 && (
+                            <span className="flex items-center gap-1 text-tiny text-[var(--text-muted)]">
+                              <Play className="w-3 h-3" /> {wf.run_count}
+                            </span>
+                          )}
                         </div>
                       </div>
 
                       {/* Menu */}
                       <div className="relative" onClick={e => e.stopPropagation()}>
                         <button onClick={() => setMenuOpen(menuOpen === wf.id ? null : wf.id)} className="w-7 h-7 rounded flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--foreground)] hover:bg-[rgba(255,255,255,0.04)] opacity-0 group-hover:opacity-100 transition-all">
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+                          <MoreVertical className="w-3.5 h-3.5" />
                         </button>
                         {menuOpen === wf.id && (
                           <div className="context-menu-appear absolute right-0 top-8 w-40 bg-[var(--bg-elevated)] border border-[var(--border-subtle)] rounded-lg shadow-lg py-1 z-50">
                             <button onClick={() => { setRenamingId(wf.id); setRenameValue(wf.name); setMenuOpen(null); }} className="flex items-center gap-2.5 w-full px-3 py-1.5 text-small text-[var(--text-secondary)] hover:bg-[rgba(255,255,255,0.04)] hover:text-[var(--foreground)]">
-                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                              Rename
+                              <Pencil className="w-3.5 h-3.5" /> Rename
                             </button>
                             <button onClick={() => handleDuplicate(wf)} className="flex items-center gap-2.5 w-full px-3 py-1.5 text-small text-[var(--text-secondary)] hover:bg-[rgba(255,255,255,0.04)] hover:text-[var(--foreground)]">
-                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                              Duplicate
+                              <Copy className="w-3.5 h-3.5" /> Duplicate
                             </button>
                             <div className="border-t border-[var(--border-subtle)] my-1" />
                             <button onClick={() => handleDelete(wf.id)} className="flex items-center gap-2.5 w-full px-3 py-1.5 text-small text-[var(--destructive)] hover:bg-[var(--destructive)]/10">
-                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                              Delete
+                              <Trash2 className="w-3.5 h-3.5" /> Delete
                             </button>
                           </div>
                         )}
@@ -310,7 +344,7 @@ export default function DashboardPage() {
                     </div>
 
                     {/* Status dot */}
-                    <div className={`absolute top-4 right-4 w-2 h-2 rounded-full ${wf.status === 'active' ? 'bg-[var(--success)]' : 'bg-[var(--text-muted)]'}`} />
+                    <div className={`absolute top-4 right-4 w-2 h-2 rounded-full ${wf.status === 'active' ? 'bg-emerald-400' : 'bg-[var(--text-muted)]'}`} />
                   </div>
                 ))}
               </div>

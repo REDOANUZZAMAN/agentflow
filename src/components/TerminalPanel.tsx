@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Terminal, Filter, Search, Download, Maximize2, Minimize2, ChevronDown, X, Copy, ExternalLink } from 'lucide-react';
+import { Terminal, Filter, Search, Download, Maximize2, Minimize2, ChevronDown, ChevronRight, X, Copy, ExternalLink, RefreshCw, Check, ArrowDown } from 'lucide-react';
 import { useApp } from '@/lib/context';
 
 // ─── Log Entry Types ─────────────────────────────────────────
@@ -159,7 +159,7 @@ export default function TerminalPanel() {
         <Terminal className="w-3.5 h-3.5 text-gray-500" />
         <span className="text-[10px] font-mono text-gray-500">
           {isLive ? (
-            <span className="text-green-400">Terminal ⟳ (live)</span>
+            <span className="text-green-400 flex items-center gap-1">Terminal <RefreshCw className="w-2.5 h-2.5 animate-spin" /> (live)</span>
           ) : (
             'Terminal · idle'
           )}
@@ -276,14 +276,14 @@ export default function TerminalPanel() {
                 )}
                 {hasExpandable && (
                   <button onClick={() => toggleExpand(log.id)} className="ml-1 text-gray-500 hover:text-gray-300">
-                    {isExpandedLog ? '▾' : '▸'}
+                    {isExpandedLog ? <ChevronDown className="w-2.5 h-2.5 inline" /> : <ChevronRight className="w-2.5 h-2.5 inline" />}
                   </button>
                 )}
               </span>
               {/* Hover actions */}
               <div className="opacity-0 group-hover:opacity-100 flex items-center gap-0.5 absolute right-2 top-[1px]">
                 <button onClick={() => copyLine(log)} className="p-0.5 rounded hover:bg-[#30363d]" title="Copy">
-                  {copiedId === log.id ? <span className="text-[8px] text-green-400">✓</span> : <Copy className="w-2.5 h-2.5 text-gray-500" />}
+                  {copiedId === log.id ? <Check className="w-2.5 h-2.5 text-green-400" /> : <Copy className="w-2.5 h-2.5 text-gray-500" />}
                 </button>
                 {log.metadata?.nodeId && (
                   <button onClick={() => dispatch({ type: 'SET_SELECTED_NODE', payload: log.metadata!.nodeId! })} className="p-0.5 rounded hover:bg-[#30363d]" title="Go to node">
@@ -320,7 +320,7 @@ export default function TerminalPanel() {
           onClick={() => { setAutoScroll(true); bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }}
           className="absolute bottom-12 right-4 px-2 py-1 text-[10px] font-mono bg-[#30363d] text-gray-300 rounded-lg shadow-lg hover:bg-[#484f58] transition-colors z-10"
         >
-          ↓ Resume
+          <ArrowDown className="w-2.5 h-2.5 inline mr-0.5" /> Resume
         </button>
       )}
 

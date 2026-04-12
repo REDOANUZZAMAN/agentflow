@@ -5,7 +5,7 @@ import {
   Clock, Globe, FileText, Variable, DollarSign,
   ChevronRight, ChevronDown, PanelRightClose, PanelRightOpen,
   CheckCircle2, XCircle, Loader2, ArrowRight, Copy, ExternalLink,
-  Image as ImageIcon, Film, Volume2,
+  Image as ImageIcon, Film, Volume2, Cloud, Brain, Inbox,
 } from 'lucide-react';
 import { useApp } from '@/lib/context';
 import type { ExecutionEvent } from '@/lib/types';
@@ -200,7 +200,7 @@ function NetworkView({ events }: { events: ExecutionEvent[] }) {
         const isExpanded = expandedId === event.id;
 
         const statusColor = status >= 500 ? 'text-red-400' : status >= 400 ? 'text-yellow-400' : 'text-green-400';
-        const serviceEmoji = service.includes('fal') ? '' : service.includes('cloudinary') ? '' : service.includes('claude') ? '' : '';
+        const ServiceIcon = service.includes('fal') ? ImageIcon : service.includes('cloudinary') ? Cloud : service.includes('claude') ? Brain : Globe;
 
         return (
           <div key={event.id}>
@@ -208,7 +208,7 @@ function NetworkView({ events }: { events: ExecutionEvent[] }) {
               onClick={() => setExpandedId(isExpanded ? null : event.id)}
               className="w-full px-3 py-2 flex items-center gap-2 hover:bg-[var(--secondary)] transition-colors text-left"
             >
-              <span className="text-xs">{serviceEmoji}</span>
+              <ServiceIcon className="w-3.5 h-3.5 text-[var(--muted-foreground)]" />
               <span className={`text-[10px] font-mono font-bold ${statusColor}`}>{method}</span>
               <span className="flex-1 text-[11px] text-[var(--foreground)] truncate">
                 {model || service || url}
@@ -482,10 +482,10 @@ function CostView({ events }: { events: ExecutionEvent[] }) {
 
       {/* Stats grid */}
       <div className="grid grid-cols-2 gap-2">
-        <StatCard label="API Calls" value={apiCallEvents.length.toString()} icon="" />
-        <StatCard label="Assets Created" value={assetEvents.length.toString()} icon="" />
-        <StatCard label="Total Duration" value={`${(nodeEndEvents.reduce((s, e) => s + (e.duration || 0), 0) / 1000).toFixed(1)}s`} icon="⏱" />
-        <StatCard label="Avg per Node" value={completedNodes > 0 ? `$${(totalCost / completedNodes).toFixed(3)}` : '$0'} icon="" />
+        <StatCard label="API Calls" value={apiCallEvents.length.toString()} Icon={Globe} />
+        <StatCard label="Assets Created" value={assetEvents.length.toString()} Icon={ImageIcon} />
+        <StatCard label="Total Duration" value={`${(nodeEndEvents.reduce((s, e) => s + (e.duration || 0), 0) / 1000).toFixed(1)}s`} Icon={Clock} />
+        <StatCard label="Avg per Node" value={completedNodes > 0 ? `$${(totalCost / completedNodes).toFixed(3)}` : '$0'} Icon={DollarSign} />
       </div>
 
       {/* Cost by model */}
@@ -556,11 +556,11 @@ function CostView({ events }: { events: ExecutionEvent[] }) {
 
 // ─── SHARED COMPONENTS ──────────────────────────────────────
 
-function StatCard({ label, value, icon }: { label: string; value: string; icon: string }) {
+function StatCard({ label, value, Icon }: { label: string; value: string; Icon: React.ComponentType<{ className?: string }> }) {
   return (
     <div className="p-3 rounded-lg bg-[var(--card)] border border-[var(--border)]">
       <div className="flex items-center gap-1.5 mb-1">
-        <span className="text-sm">{icon}</span>
+        <Icon className="w-3.5 h-3.5 text-[var(--muted-foreground)]" />
         <span className="text-[10px] text-[var(--muted-foreground)]">{label}</span>
       </div>
       <p className="text-lg font-bold text-[var(--foreground)]">{value}</p>
@@ -585,11 +585,11 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-function EmptyState({ emoji, title, description }: { emoji: string; title: string; description: string }) {
+function EmptyState({ emoji, title, description }: { emoji?: string; title: string; description: string }) {
   return (
     <div className="flex items-center justify-center h-full min-h-[200px]">
       <div className="text-center px-6">
-        <div className="text-3xl mb-2">{emoji}</div>
+        <div className="mb-2 flex justify-center"><Inbox className="w-8 h-8 text-[var(--muted-foreground)] opacity-40" /></div>
         <h3 className="text-sm font-medium text-[var(--foreground)] mb-1">{title}</h3>
         <p className="text-xs text-[var(--muted-foreground)]">{description}</p>
       </div>

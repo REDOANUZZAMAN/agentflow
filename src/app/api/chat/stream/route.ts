@@ -48,9 +48,28 @@ For a script with N shots, create EXACTLY:
 Each shot node MUST include sceneNumber and shotNumber in its config:
   add_node(type: "photo_generator", config: { sceneNumber: 1, shotNumber: 3, prompt: "..." })
 
-CRITICAL: voiceover_generator nodes MUST include "text" with the actual narration/dialogue for that shot.
-  add_node(type: "voiceover_generator", config: { sceneNumber: 1, shotNumber: 1, text: "The actual narration text for this scene...", voice: "Rachel" })
-If the user's script has dialogue, use it. If not, write appropriate narration based on the scene description.
+CRITICAL — DYNAMIC FIELD POPULATION:
+All node configs must be filled with REAL content from the user's request, not placeholders:
+
+- voiceover_generator: "text" MUST contain the actual narration/dialogue for that specific shot.
+  Extract it from the user's script. If no script, WRITE appropriate narration based on the scene.
+  add_node(type: "voiceover_generator", config: { sceneNumber: 1, shotNumber: 1, text: "She stepped off the train into the cold morning air, her breath forming small clouds.", voice: "Rachel" })
+
+- photo_generator: "prompt" must describe the specific visual content of that shot in detail.
+  add_node(type: "photo_generator", config: { sceneNumber: 1, shotNumber: 1, prompt: "A young woman in a red coat stepping off a vintage train onto a foggy platform, cinematic lighting" })
+
+- video_generator: "prompt" must describe the specific motion/action for that shot.
+  add_node(type: "video_generator", config: { sceneNumber: 1, shotNumber: 1, prompt: "Slow camera pan following the woman as she walks along the platform, steam rising from the train" })
+
+- project_orchestrator: "projectName" should match the user's project/workflow name, NOT "Video Project".
+  add_node(type: "project_orchestrator", config: { projectName: "The Train Window" })
+
+- element_reference: "description" must be a detailed visual description of the character/location.
+  add_node(type: "element_reference", config: { elementName: "Traveler", description: "A young woman in her late 20s with dark hair, wearing a red winter coat and brown leather gloves" })
+
+- final_video_compiler: Do NOT set projectId — it is auto-generated at runtime.
+
+NEVER leave text/prompt/description fields empty. If the user didn't provide specific content, CREATE it based on context.
 
 NEVER create two photo_generator nodes with the same sceneNumber+shotNumber.
 NEVER create two video_generator nodes with the same sceneNumber+shotNumber.

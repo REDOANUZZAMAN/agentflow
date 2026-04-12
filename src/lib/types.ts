@@ -13,6 +13,14 @@ export type NodeType =
   | 'image_gen'
   | 'video_gen'
   | 'voice_gen'
+  // Video Pipeline
+  | 'script_parser'
+  | 'element_reference'
+  | 'photo_generator'
+  | 'video_generator'
+  | 'voiceover_generator'
+  | 'project_orchestrator'
+  | 'final_video_compiler'
   // Social
   | 'post_x'
   | 'post_instagram'
@@ -97,6 +105,19 @@ export const NODE_CATEGORIES: NodeCategory[] = [
     ],
   },
   {
+    name: 'Video Pipeline',
+    emoji: '🎥',
+    types: [
+      { type: 'script_parser', label: 'Script Parser', description: 'Parse a script into scenes & shots', emoji: '📜' },
+      { type: 'element_reference', label: 'Element Reference', description: 'Generate consistent character/location refs', emoji: '🎭' },
+      { type: 'photo_generator', label: 'Photo Generator', description: 'Generate shot photos via fal.ai', emoji: '📸' },
+      { type: 'video_generator', label: 'Video Generator (fal)', description: 'Generate shot videos via fal.ai', emoji: '🎬' },
+      { type: 'voiceover_generator', label: 'Voiceover Generator', description: 'Generate voiceover audio via fal.ai TTS', emoji: '🗣️' },
+      { type: 'project_orchestrator', label: 'Project Orchestrator', description: 'Run full script-to-video pipeline', emoji: '🎯' },
+      { type: 'final_video_compiler', label: 'Final Video Compiler', description: 'Merge all shots into one video with transitions & audio', emoji: '🎞️' },
+    ],
+  },
+  {
     name: 'Logic',
     emoji: '⚙️',
     types: [
@@ -134,6 +155,8 @@ export interface ChatMessage {
   timestamp: Date;
   toolCalls?: ToolCallInfo[];
   buttons?: ChatButton[];
+  videoUrl?: string;
+  videoLabel?: string;
 }
 
 export interface ChatButton {
@@ -150,11 +173,29 @@ export interface ToolCallInfo {
   status: 'pending' | 'running' | 'done' | 'error';
 }
 
+// Task List
+export type TaskStatus = 'pending' | 'running' | 'done' | 'failed';
+
+export interface Task {
+  id: string;
+  title: string;
+  status: TaskStatus;
+  startedAt?: Date;
+  completedAt?: Date;
+  errorReason?: string;
+}
+
+export interface TaskList {
+  id: string;
+  tasks: Task[];
+  createdAt: Date;
+}
+
 // Execution events for the inspector
 export interface ExecutionEvent {
   id: string;
   timestamp: Date;
-  type: 'node_start' | 'node_end' | 'api_call' | 'llm_prompt' | 'llm_response' | 'error' | 'log' | 'variable_set';
+  type: 'node_start' | 'node_end' | 'node_error' | 'api_call' | 'llm_prompt' | 'llm_response' | 'error' | 'log' | 'variable_set' | 'asset_created' | 'workflow_done';
   nodeId?: string;
   nodeName?: string;
   data: Record<string, unknown>;
@@ -201,6 +242,8 @@ export const BUILDER_TOOLS = [
           enum: [
             'manual_trigger', 'schedule_trigger', 'webhook_trigger',
             'claude_chat', 'image_gen', 'video_gen', 'voice_gen',
+            'script_parser', 'element_reference', 'photo_generator',
+            'video_generator', 'voiceover_generator', 'project_orchestrator', 'final_video_compiler',
             'post_x', 'post_instagram', 'post_linkedin', 'post_tiktok',
             'send_email', 'send_telegram',
             'http_request', 'web_search', 'web_scraper',
@@ -280,6 +323,109 @@ export const BUILDER_TOOLS = [
         node_id: { type: 'string', description: 'The node that produced the error' },
       },
       required: ['error_message'],
+    },
+  },
+  // Task list tools
+  {
+    name: 'create_task_list',
+    description: 'Create a task checklist to show the user your plan. ALWAYS use this before doing multi-step work. Break the goal into 3-10 clear, plain-English steps.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        tasks: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string', description: 'Unique task ID like task_1, task_2' },
+              title: { type: 'string', description: 'Plain English description of the step' },
+            },
+            required: ['id', 'title'],
+          },
+          description: 'List of tasks in order',
+        },
+      },
+      required: ['tasks'],
+    },
+  },
+  {
+    name: 'start_task',
+    description: 'Mark a task as in-progress. Call this before starting work on a task.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        task_id: { type: 'string', description: 'The task ID to start' },
+      },
+      required: ['task_id'],
+    },
+  },
+  {
+    name: 'complete_task',
+    description: 'Mark a task as completed. Call this when you finish a task.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        task_id: { type: 'string', description: 'The task ID to mark done' },
+      },
+      required: ['task_id'],
+    },
+  },
+  {
+    name: 'fail_task',
+    description: 'Mark a task as failed with a friendly explanation.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        task_id: { type: 'string', description: 'The task ID that failed' },
+        reason: { type: 'string', description: 'Plain English explanation of what went wrong' },
+      },
+      required: ['task_id', 'reason'],
+    },
+  },
+  {
+    name: 'add_task',
+    description: 'Add a new task to the existing task list.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        task_id: { type: 'string', description: 'Unique ID for the new task' },
+        title: { type: 'string', description: 'Plain English description' },
+        after_task_id: { type: 'string', description: 'Insert after this task ID. If omitted, appends to end.' },
+      },
+      required: ['task_id', 'title'],
+    },
+  },
+  {
+    name: 'update_task',
+    description: 'Update the title of an existing task.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        task_id: { type: 'string', description: 'The task ID to update' },
+        title: { type: 'string', description: 'New title for the task' },
+      },
+      required: ['task_id', 'title'],
+    },
+  },
+  {
+    name: 'list_nodes',
+    description: 'List all existing nodes on the canvas. Call this at the start of continuation rounds to see what has already been built and avoid duplicates.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {},
+    },
+  },
+  {
+    name: 'workflow_ready',
+    description: 'Call this ONLY when the entire workflow is fully built and all nodes are connected. This signals to the system that you are done building. Do NOT call this prematurely — only after every node has been added and every connection made.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        summary: { type: 'string', description: 'A plain English summary of the completed workflow' },
+        node_count: { type: 'number', description: 'Total number of nodes created' },
+        edge_count: { type: 'number', description: 'Total number of connections made' },
+      },
+      required: ['summary'],
     },
   },
 ];

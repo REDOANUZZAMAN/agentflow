@@ -178,3 +178,97 @@ body {
 .typing-dot:nth-child(1) { animation: typingDot 1.4s infinite 0s; }
 .typing-dot:nth-child(2) { animation: typingDot 1.4s infinite 0.2s; }
 .typing-dot:nth-child(3) { animation: typingDot 1.4s infinite 0.4s; }
+
+/* Task list animations */
+@keyframes taskCheckDraw {
+  0% {
+    opacity: 0;
+    transform: scale(0.5) rotate(-10deg);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.2) rotate(5deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+.task-check-animate {
+  animation: taskCheckDraw 0.4s ease-out;
+}
+
+@keyframes taskCardSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    max-height: 500px;
+  }
+}
+
+.task-list-card {
+  animation: taskCardSlideIn 0.3s ease-out;
+}
+
+@keyframes taskItemHighlight {
+  0% {
+    background-color: rgba(99, 102, 241, 0.1);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+/* Toast/celebration animation */
+@keyframes celebrationPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.8) translateY(10px);
+  }
+  50% {
+    transform: scale(1.05) translateY(-2px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.celebration-pop {
+  animation: celebrationPop 0.5s ease-out;
+}
+
+/* Context menu animation */
+@keyframes contextMenuAppear {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+.context-menu-appear {
+  animation: contextMenuAppear 0.12s ease-out;
+}
+
+/* Resize handle */
+.resize-handle {
+  width: 4px;
+  cursor: col-resize;
+  background: transparent;
+  transition: background 0.15s;
+  flex-shrink: 0;
+  z-index: 10;
+}
+.resize-handle:hover,
+.resize-handle:active {
+  background: var(--primary);
+}
+
+/* Drag-over canvas highlight */
+.react-flow__pane.drag-over {
+  outline: 2px dashed var(--primary);
+  outline-offset: -4px;
+}

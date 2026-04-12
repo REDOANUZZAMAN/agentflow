@@ -2,7 +2,8 @@
 // AgentFlow Global Store (using React context + useReducer)
 // ============================================================
 
-import { ChatMessage, ExecutionEvent, WorkflowNode, WorkflowEdge, NodeType, getNodeMeta } from './types';
+import { ChatMessage, ExecutionEvent, WorkflowNode, WorkflowEdge, NodeType, getNodeMeta, Task, TaskList } from './types';
+import type { TerminalLogEntry } from '@/components/TerminalPanel';
 
 // State
 export interface AppState {
@@ -24,6 +25,13 @@ export interface AppState {
   // Execution
   isRunning: boolean;
   selectedNodeId: string | null;
+
+  // Task List
+  taskList: Task[] | null;
+  taskListCollapsed: boolean;
+
+  // Terminal
+  terminalLogs: TerminalLogEntry[];
 
   // Panel widths (percentages)
   leftPanelWidth: number;
@@ -47,6 +55,7 @@ export const initialState: AppState = {
         { label: '🐦 Auto-post to social media', action: 'Create an agent that generates a motivational quote and posts it to Twitter every morning' },
         { label: '😂 Daily joke by email', action: 'Send me a daily joke by email every morning at 8am' },
         { label: '🔍 Web monitor with alerts', action: 'Monitor a website for changes and send me a Telegram message when something changes' },
+        { label: '🎬 Script to video', action: 'I have a script with scenes and shots. Build me a pipeline that generates photos, videos, and voiceovers for each shot using fal.ai and organizes everything in Cloudinary.' },
       ],
     },
   ],
@@ -58,6 +67,11 @@ export const initialState: AppState = {
 
   isRunning: false,
   selectedNodeId: null,
+
+  taskList: null,
+  taskListCollapsed: false,
+
+  terminalLogs: [],
 
   leftPanelWidth: 25,
   rightPanelWidth: 25,
@@ -74,6 +88,7 @@ export type Action =
   | { type: 'SET_EDGES'; payload: WorkflowEdge[] }
   | { type: 'MOVE_NODE'; payload: { id: string; position: { x: number; y: number } } }
   | { type: 'ADD_MESSAGE'; payload: ChatMessage }
+  | { type: 'SET_MESSAGES'; payload: ChatMessage[] }
   | { type: 'UPDATE_MESSAGE'; payload: { id: string; content?: string; toolCalls?: ChatMessage['toolCalls'] } }
   | { type: 'SET_AI_TYPING'; payload: boolean }
   | { type: 'ADD_EXECUTION_EVENT'; payload: ExecutionEvent }
@@ -84,7 +99,20 @@ export type Action =
   | { type: 'SET_SELECTED_NODE'; payload: string | null }
   | { type: 'SET_NODE_STATUS'; payload: { id: string; status: 'idle' | 'running' | 'success' | 'error'; error?: string; output?: unknown } }
   | { type: 'SET_PANEL_WIDTH'; payload: { panel: 'left' | 'right'; width: number } }
-  | { type: 'SET_WORKFLOW_META'; payload: { name?: string; emoji?: string } };
+  | { type: 'SET_WORKFLOW_META'; payload: { name?: string; emoji?: string } }
+  // Task list actions
+  | { type: 'CREATE_TASK_LIST'; payload: Task[] }
+  | { type: 'START_TASK'; payload: string }
+  | { type: 'COMPLETE_TASK'; payload: string }
+  | { type: 'FAIL_TASK'; payload: { id: string; reason: string } }
+  | { type: 'ADD_TASK'; payload: { task: Task; afterTaskId?: string } }
+  | { type: 'UPDATE_TASK'; payload: { id: string; title: string } }
+  | { type: 'TOGGLE_TASK_LIST'; payload?: boolean }
+  | { type: 'CLEAR_TASK_LIST' }
+  // Terminal actions
+  | { type: 'ADD_TERMINAL_LOG'; payload: TerminalLogEntry }
+  | { type: 'CLEAR_TERMINAL_LOGS' }
+  | { type: 'TOGGLE_TERMINAL_LOG_EXPAND'; payload: string };
 
 export function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
@@ -129,6 +157,9 @@ export function reducer(state: AppState, action: Action): AppState {
     case 'ADD_MESSAGE':
       return { ...state, messages: [...state.messages, action.payload] };
 
+    case 'SET_MESSAGES':
+      return { ...state, messages: action.payload };
+
     case 'UPDATE_MESSAGE':
       return {
         ...state,
@@ -143,6 +174,7 @@ export function reducer(state: AppState, action: Action): AppState {
       return { ...state, isAiTyping: action.payload };
 
     case 'ADD_EXECUTION_EVENT':
+      if (state.executionEvents.some(e => e.id === action.payload.id)) return state;
       return { ...state, executionEvents: [...state.executionEvents, action.payload] };
 
     case 'CLEAR_EXECUTION_EVENTS':
@@ -183,6 +215,85 @@ export function reducer(state: AppState, action: Action): AppState {
         ...(action.payload.emoji !== undefined ? { workflowEmoji: action.payload.emoji } : {}),
       };
 
+    // Task list actions
+    case 'CREATE_TASK_LIST':
+      return { ...state, taskList: action.payload, taskListCollapsed: false };
+
+    case 'START_TASK':
+      return {
+        ...state,
+        taskList: state.taskList?.map((t) =>
+          t.id === action.payload ? { ...t, status: 'running' as const, startedAt: new Date() } : t
+        ) || null,
+      };
+
+    case 'COMPLETE_TASK':
+      return {
+        ...state,
+        taskList: state.taskList?.map((t) =>
+          t.id === action.payload ? { ...t, status: 'done' as const, completedAt: new Date() } : t
+        ) || null,
+      };
+
+    case 'FAIL_TASK':
+      return {
+        ...state,
+        taskList: state.taskList?.map((t) =>
+          t.id === action.payload.id ? { ...t, status: 'failed' as const, errorReason: action.payload.reason, completedAt: new Date() } : t
+        ) || null,
+      };
+
+    case 'ADD_TASK': {
+      if (!state.taskList) return { ...state, taskList: [action.payload.task] };
+      const tasks = [...state.taskList];
+      if (action.payload.afterTaskId) {
+        const idx = tasks.findIndex((t) => t.id === action.payload.afterTaskId);
+        if (idx !== -1) {
+          tasks.splice(idx + 1, 0, action.payload.task);
+        } else {
+          tasks.push(action.payload.task);
+        }
+      } else {
+        tasks.push(action.payload.task);
+      }
+      return { ...state, taskList: tasks };
+    }
+
+    case 'UPDATE_TASK':
+      return {
+        ...state,
+        taskList: state.taskList?.map((t) =>
+          t.id === action.payload.id ? { ...t, title: action.payload.title } : t
+        ) || null,
+      };
+
+    case 'TOGGLE_TASK_LIST':
+      return {
+        ...state,
+        taskListCollapsed: action.payload !== undefined ? action.payload : !state.taskListCollapsed,
+      };
+
+    case 'CLEAR_TASK_LIST':
+      return { ...state, taskList: null };
+
+    // Terminal actions
+    case 'ADD_TERMINAL_LOG':
+      if (state.terminalLogs.some(l => l.id === action.payload.id)) return state;
+      return { ...state, terminalLogs: [...state.terminalLogs.slice(-999), action.payload] };
+
+    case 'CLEAR_TERMINAL_LOGS':
+      return { ...state, terminalLogs: [] };
+
+    case 'TOGGLE_TERMINAL_LOG_EXPAND':
+      return {
+        ...state,
+        terminalLogs: state.terminalLogs.map((l) =>
+          l.id === action.payload
+            ? { ...l, metadata: { ...l.metadata, expanded: !l.metadata?.expanded } }
+            : l
+        ),
+      };
+
     default:
       return state;
   }
@@ -217,49 +328,103 @@ export function createEdge(source: string, target: string): WorkflowEdge {
   };
 }
 
-// Auto-layout nodes vertically
+// Smart grid-based auto-layout for video pipeline workflows
 export function autoLayout(nodes: WorkflowNode[], edges: WorkflowEdge[]): WorkflowNode[] {
   if (nodes.length === 0) return nodes;
 
-  // Simple vertical layout
-  const startX = 300;
-  const startY = 80;
-  const gapY = 150;
+  const COL_W = 280;
+  const ROW_H = 180;
 
-  // Find root nodes (no incoming edges)
-  const hasIncoming = new Set(edges.map((e) => e.target));
-  const roots = nodes.filter((n) => !hasIncoming.has(n.id));
-  const rest = nodes.filter((n) => hasIncoming.has(n.id));
+  // Categorize nodes
+  const triggers: WorkflowNode[] = [];
+  const elements: WorkflowNode[] = [];
+  const photos: WorkflowNode[] = [];
+  const videos: WorkflowNode[] = [];
+  const voiceovers: WorkflowNode[] = [];
+  const orchestrators: WorkflowNode[] = [];
+  const compilers: WorkflowNode[] = [];
+  const others: WorkflowNode[] = [];
 
-  // BFS ordering
-  const ordered: WorkflowNode[] = [];
-  const visited = new Set<string>();
-  const queue = [...roots];
-
-  while (queue.length > 0) {
-    const node = queue.shift()!;
-    if (visited.has(node.id)) continue;
-    visited.add(node.id);
-    ordered.push(node);
-
-    // Find children
-    const children = edges
-      .filter((e) => e.source === node.id)
-      .map((e) => nodes.find((n) => n.id === e.target))
-      .filter(Boolean) as WorkflowNode[];
-
-    queue.push(...children);
+  for (const n of nodes) {
+    const t = n.data.type;
+    if (['manual_trigger', 'schedule_trigger', 'webhook_trigger'].includes(t)) triggers.push(n);
+    else if (t === 'element_reference') elements.push(n);
+    else if (t === 'photo_generator' || t === 'image_gen') photos.push(n);
+    else if (t === 'video_generator' || t === 'video_gen') videos.push(n);
+    else if (t === 'voiceover_generator' || t === 'voice_gen') voiceovers.push(n);
+    else if (t === 'project_orchestrator') orchestrators.push(n);
+    else if (t === 'final_video_compiler') compilers.push(n);
+    else others.push(n);
   }
 
-  // Add any unvisited nodes
-  for (const n of rest) {
-    if (!visited.has(n.id)) {
-      ordered.push(n);
+  // Check if this is a video pipeline workflow
+  const isVideoPipeline = photos.length > 0 || videos.length > 0;
+
+  if (!isVideoPipeline) {
+    // Simple vertical layout for non-pipeline workflows
+    const hasIncoming = new Set(edges.map(e => e.target));
+    const roots = nodes.filter(n => !hasIncoming.has(n.id));
+    const visited = new Set<string>();
+    const ordered: WorkflowNode[] = [];
+    const queue = [...roots];
+    while (queue.length > 0) {
+      const node = queue.shift()!;
+      if (visited.has(node.id)) continue;
+      visited.add(node.id);
+      ordered.push(node);
+      const children = edges.filter(e => e.source === node.id).map(e => nodes.find(n => n.id === e.target)).filter(Boolean) as WorkflowNode[];
+      queue.push(...children);
     }
+    for (const n of nodes) { if (!visited.has(n.id)) ordered.push(n); }
+    return ordered.map((node, i) => ({ ...node, position: { x: 300, y: 80 + i * 150 } }));
   }
 
-  return ordered.map((node, i) => ({
-    ...node,
-    position: { x: startX, y: startY + i * gapY },
-  }));
+  // Video pipeline grid layout
+  const sortByShot = (a: WorkflowNode, b: WorkflowNode) =>
+    ((a.data.config as any)?.shotNumber || 0) - ((b.data.config as any)?.shotNumber || 0);
+  photos.sort(sortByShot);
+  videos.sort(sortByShot);
+  voiceovers.sort(sortByShot);
+
+  const maxCols = Math.max(elements.length, photos.length, videos.length, voiceovers.length, 1);
+  const centerX = 150 + ((maxCols - 1) * COL_W) / 2;
+
+  const result: WorkflowNode[] = [];
+
+  // Row 0: Triggers (centered)
+  for (const n of triggers) {
+    result.push({ ...n, position: { x: centerX, y: 0 } });
+  }
+  // Row 1: Element references
+  for (let i = 0; i < elements.length; i++) {
+    result.push({ ...elements[i], position: { x: 150 + i * COL_W, y: ROW_H } });
+  }
+  // Row 2: Photos (by shot number)
+  for (let i = 0; i < photos.length; i++) {
+    result.push({ ...photos[i], position: { x: 150 + i * COL_W, y: 2 * ROW_H } });
+  }
+  // Row 3: Videos
+  for (let i = 0; i < videos.length; i++) {
+    result.push({ ...videos[i], position: { x: 150 + i * COL_W, y: 3 * ROW_H } });
+  }
+  // Row 4: Voiceovers
+  for (let i = 0; i < voiceovers.length; i++) {
+    result.push({ ...voiceovers[i], position: { x: 150 + i * COL_W, y: 4 * ROW_H } });
+  }
+  // Row 5: Orchestrator
+  for (const n of orchestrators) {
+    result.push({ ...n, position: { x: centerX, y: 5 * ROW_H } });
+  }
+  // Row 6: Compiler
+  for (const n of compilers) {
+    result.push({ ...n, position: { x: centerX, y: 6 * ROW_H } });
+  }
+  // Remaining nodes below
+  let othersY = 7 * ROW_H;
+  for (const n of others) {
+    result.push({ ...n, position: { x: centerX, y: othersY } });
+    othersY += 150;
+  }
+
+  return result;
 }

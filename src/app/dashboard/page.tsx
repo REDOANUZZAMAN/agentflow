@@ -61,6 +61,8 @@ export default function DashboardPage() {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [totalExecutions, setTotalExecutions] = useState(0);
+  const [monthExecutions, setMonthExecutions] = useState(0);
 
   useEffect(() => {
     const init = async () => {
@@ -68,7 +70,27 @@ export default function DashboardPage() {
       if (!user) { router.push('/signin'); return; }
       setUser(user);
       const { data } = await supabase.from('workflows').select('*').eq('user_id', user.id).order('updated_at', { ascending: false });
-      setWorkflows(data || []);
+      const wfs = data || [];
+      setWorkflows(wfs);
+
+      // Fetch execution counts for real stats
+      if (wfs.length > 0) {
+        const wfIds = wfs.map(w => w.id);
+        try {
+          // Total executions
+          const { count: totalCount } = await supabase.from('executions').select('*', { count: 'exact', head: true }).in('workflow_id', wfIds);
+          setTotalExecutions(totalCount || 0);
+          // This month's executions
+          const startOfMonth = new Date();
+          startOfMonth.setDate(1);
+          startOfMonth.setHours(0, 0, 0, 0);
+          const { count: monthCount } = await supabase.from('executions').select('*', { count: 'exact', head: true }).in('workflow_id', wfIds).gte('started_at', startOfMonth.toISOString());
+          setMonthExecutions(monthCount || 0);
+        } catch {
+          // Executions table might not exist yet — use workflow run_count as fallback
+          setTotalExecutions(wfs.reduce((s, w) => s + (w.run_count || 0), 0));
+        }
+      }
       setLoading(false);
     };
     init();
@@ -123,8 +145,9 @@ export default function DashboardPage() {
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
-  const activeCount = workflows.filter(w => w.status === 'active').length;
-  const totalRuns = workflows.reduce((s, w) => s + (w.run_count || 0), 0);
+  // Active = workflows with at least 1 node (they have content)
+  const activeCount = workflows.filter(w => w.nodes && w.nodes.length > 0).length;
+  const totalRuns = totalExecutions || workflows.reduce((s, w) => s + (w.run_count || 0), 0);
 
   // Map workflow emoji field to a Lucide icon
   const getWorkflowIcon = (emoji: string) => {
@@ -143,13 +166,13 @@ export default function DashboardPage() {
     <div className="min-h-screen flex bg-[var(--background)]">
       {/* ─── Sidebar ─────────────────────────────────────────────── */}
       <aside className={`${sidebarCollapsed ? 'w-16' : 'w-60'} flex-shrink-0 border-r border-[var(--border-subtle)] bg-[var(--bg-sunken)] flex flex-col transition-all duration-200`}>
-        {/* Logo */}
-        <div className="h-14 flex items-center gap-2.5 px-4 border-b border-[var(--border-subtle)]">
+        {/* Logo — links to landing page */}
+        <Link href="/" className="h-14 flex items-center gap-2.5 px-4 border-b border-[var(--border-subtle)] hover:bg-[rgba(255,255,255,0.02)] transition-colors">
           <div className="w-7 h-7 rounded-lg bg-[var(--primary)] flex items-center justify-center flex-shrink-0">
             <Zap className="w-3.5 h-3.5 text-white" strokeWidth={2.5} />
           </div>
           {!sidebarCollapsed && <span className="text-[14px] font-semibold tracking-tight">AgentFlow</span>}
-        </div>
+        </Link>
 
         {/* Nav */}
         <nav className="flex-1 py-3 px-2 space-y-0.5">
@@ -211,7 +234,7 @@ export default function DashboardPage() {
               { label: 'Workflows', value: workflows.length, icon: <ClipboardList className="w-4 h-4 text-[var(--primary)]" /> },
               { label: 'Active', value: activeCount, icon: <Activity className="w-4 h-4 text-emerald-400" /> },
               { label: 'Total runs', value: totalRuns, icon: <Play className="w-4 h-4 text-blue-400" /> },
-              { label: 'This month', value: workflows.filter(w => w.last_run_at && new Date(w.last_run_at).getMonth() === new Date().getMonth()).length + ' runs', icon: <BarChart3 className="w-4 h-4 text-amber-400" /> },
+              { label: 'This month', value: `${monthExecutions} runs`, icon: <BarChart3 className="w-4 h-4 text-amber-400" /> },
             ].map((s, i) => (
               <div key={i} className="card p-4">
                 <div className="flex items-center justify-between mb-2">

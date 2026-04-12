@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@supabase/supabase-js';
 import { BUILDER_TOOLS, getNodeMeta, type NodeType } from '@/lib/types';
+import { applyDefaults } from '@/lib/node-defaults';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY || '',
@@ -93,13 +94,16 @@ You have tools to modify the canvas:
    - For a script with N shots and M elements, create: 1 trigger + M element_reference nodes + N × 3 nodes per shot (photo, video, voiceover) + 1 project_orchestrator + 1 final_video_compiler + ALL connect_nodes calls
    - Do NOT say "I'll continue building the rest later" — complete everything NOW
    - Only after every node is created and connected should you tell the user the workflow is ready
-4. **ALWAYS fill required fields with sensible defaults.** Never create a node with empty required fields:
-   - Image / Element Reference model: 'fal-ai/nano-banana-2'
-   - Video model: 'fal-ai/kling-video/v3/pro/image-to-video'
-   - Voice model: 'fal-ai/elevenlabs/tts'
-   - Claude model: 'claude-sonnet-4-6'
-   - Photo dimensions: width=1920, height=1080
-   - Video duration: 4 seconds
+4. **ALWAYS fill ALL config fields — the system applies defaults but YOU must provide prompt text and names.**
+   Required defaults per node type:
+   - element_reference: model='fal-ai/nano-banana-2', elementName=@Name, description=visual desc
+   - photo_generator: model='fal-ai/nano-banana-2', prompt=scene desc, width=1920, height=1080
+   - video_generator: model='fal-ai/kling-video/o3/pro/image-to-video', prompt=motion desc, duration=5
+   - voiceover_generator: model='fal-ai/elevenlabs/text-to-dialogue/eleven-v3', voice='Rachel', text=dialogue
+   - project_orchestrator: projectName=workflow name (NOT 'My Video Project'), photoModel, videoModel, voiceModel all filled
+   - final_video_compiler: transition='cut', outputResolution='1920x1080', outputFormat='mp4', mode='cloudinary'
+   - claude_chat: model='claude-sonnet-4-6', prompt=instruction text
+   NEVER use placeholder values like 'proj_phishing_001', 'My Video Project', '@Hacker', 'YOUR_PROJECT_ID'
 5. Use descriptive configs — set schedule time, email subject, prompt text, model names, etc.
 6. When explaining, use emoji and simple language
 7. If a credential/API key is needed, tell the user in a friendly way
@@ -320,7 +324,9 @@ async function callSupabaseClaudeProxy(
         const position = (toolInput.position as { x: number; y: number }) || {
           x: 300, y: 80 + (nodes.length + existingToolCalls.filter((t: any) => t.name === 'add_node').length) * 150,
         };
-        result = { nodeId, type: nodeType, label: meta.label, emoji: meta.emoji, config: toolInput.config || {}, position };
+        // AUTO-FILL: Apply schema defaults to any missing required fields
+        const mergedConfig = applyDefaults(nodeType, (toolInput.config as Record<string, unknown>) || {});
+        result = { nodeId, type: nodeType, label: meta.label, emoji: meta.emoji, config: mergedConfig, position };
         break;
       }
       case 'connect_nodes':
@@ -729,7 +735,9 @@ async function callOpenRouterAPI(message: string, history: any[], nodes: any[], 
               x: 300,
               y: 80 + (nodes.length + toolCalls.filter((t: any) => t.name === 'add_node').length) * 150,
             };
-            result = { nodeId, type: nodeType, label: meta.label, emoji: meta.emoji, config: toolInput.config || {}, position };
+            // AUTO-FILL: Apply schema defaults to any missing required fields
+            const mergedConfig = applyDefaults(nodeType, (toolInput.config as Record<string, unknown>) || {});
+            result = { nodeId, type: nodeType, label: meta.label, emoji: meta.emoji, config: mergedConfig, position };
             nodeIdMap[tc.id] = nodeId;
             break;
           }
@@ -857,12 +865,14 @@ async function callClaudeAPI(message: string, history: any[], nodes: any[], edge
               y: 80 + (nodes.length + toolCalls.filter((t: any) => t.name === 'add_node').length) * 150,
             };
             
+            // AUTO-FILL: Apply schema defaults to any missing required fields
+            const mergedConfig = applyDefaults(nodeType, (toolInput.config as Record<string, unknown>) || {});
             result = {
               nodeId,
               type: nodeType,
               label: meta.label,
               emoji: meta.emoji,
-              config: toolInput.config || {},
+              config: mergedConfig,
               position,
             };
             

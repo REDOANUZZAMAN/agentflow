@@ -4,6 +4,7 @@
 
 import { ChatMessage, ExecutionEvent, WorkflowNode, WorkflowEdge, NodeType, getNodeMeta, Task, TaskList } from './types';
 import type { TerminalLogEntry } from '@/components/TerminalPanel';
+import { applyDefaults } from './node-defaults';
 
 // State
 export interface AppState {
@@ -11,8 +12,7 @@ export interface AppState {
   nodes: WorkflowNode[];
   edges: WorkflowEdge[];
   workflowName: string;
-  workflowEmoji: string;
-
+  workflowEmoji: string
   // Chat
   messages: ChatMessage[];
   isAiTyping: boolean;
@@ -109,6 +109,7 @@ export type Action =
   | { type: 'UPDATE_TASK'; payload: { id: string; title: string } }
   | { type: 'TOGGLE_TASK_LIST'; payload?: boolean }
   | { type: 'CLEAR_TASK_LIST' }
+  | { type: 'AUTO_FIX_DEFAULTS' }
   // Terminal actions
   | { type: 'ADD_TERMINAL_LOG'; payload: TerminalLogEntry }
   | { type: 'CLEAR_TERMINAL_LOGS' }
@@ -275,6 +276,19 @@ export function reducer(state: AppState, action: Action): AppState {
 
     case 'CLEAR_TASK_LIST':
       return { ...state, taskList: null };
+
+    // Auto-fix: apply schema defaults to all nodes
+    case 'AUTO_FIX_DEFAULTS':
+      return {
+        ...state,
+        nodes: state.nodes.map((n) => ({
+          ...n,
+          data: {
+            ...n.data,
+            config: applyDefaults(n.data.type, (n.data.config as Record<string, unknown>) || {}),
+          },
+        })),
+      };
 
     // Terminal actions
     case 'ADD_TERMINAL_LOG':

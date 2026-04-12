@@ -7,6 +7,7 @@ import { fal } from '@fal-ai/client';
 import { v2 as cloudinary } from 'cloudinary';
 import { FAL_MODELS, getModelCost, pickImageModel, pickVideoModel } from './fal-models';
 import { calculateCost as calcRealCost } from './fal-pricing';
+import { applyDefaults } from './node-defaults';
 
 // Types for execution context
 export interface ExecutionContext {
@@ -637,7 +638,14 @@ export async function executeWorkflow(
     emit,
   };
 
-  const sorted = topologicalSort(nodes, edges);
+  // AUTO-FIX: Apply schema defaults to all nodes before execution
+  // This catches any empty fields the agent forgot to fill
+  const fixedNodes = nodes.map(n => ({
+    ...n,
+    data: { ...n.data, config: applyDefaults(n.data.type, n.data.config || {}) },
+  }));
+
+  const sorted = topologicalSort(fixedNodes, edges);
   let totalCost = 0;
   const allAssets: any[] = [];
   const errors: string[] = [];

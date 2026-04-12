@@ -1,18 +1,102 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { X, Play, Trash2, Copy, EyeOff, Eye, HelpCircle, StickyNote } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { X, Play, Trash2, Copy, EyeOff, Eye, HelpCircle, StickyNote, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { useApp } from '@/lib/context';
 import { getNodeMeta, type NodeType } from '@/lib/types';
 
 export default function NodeConfigPanel() {
   const { state, dispatch } = useApp();
   const selectedNode = state.nodes.find((n) => n.id === state.selectedNodeId);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ status: 'success' | 'error'; message: string; data?: any } | null>(null);
 
   if (!selectedNode) return null;
 
   const meta = getNodeMeta(selectedNode.data.type);
   const config = selectedNode.data.config || {};
+
+  const testNode = async () => {
+    setTesting(true);
+    setTestResult(null);
+    
+    // Set node status to running on canvas
+    dispatch({ type: 'SET_NODE_STATUS', payload: { id: selectedNode.id, status: 'running' } });
+
+    try {
+      const res = await fetch('/api/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nodes: [selectedNode],
+          edges: [],
+          workflowId: null,
+          userId: null,
+        }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errData.error || `HTTP ${res.status}`);
+      }
+
+      // Read SSE stream
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder();
+      let lastOutput: any = null;
+      let lastError: string | null = null;
+
+      if (reader) {
+        let buffer = '';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          
+          // Parse SSE events
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+          
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const event = JSON.parse(line.slice(6));
+                if (event.type === 'node_end' && event.nodeId === selectedNode.id) {
+                  lastOutput = event.data?.output || event.data;
+                }
+                if (event.type === 'node_error' && event.nodeId === selectedNode.id) {
+                  lastError = event.data?.error || event.data?.message || 'Node execution failed';
+                }
+                if (event.type === 'workflow_done') {
+                  // Done
+                }
+                // Forward events to inspector
+                dispatch({ type: 'ADD_EXECUTION_EVENT', payload: event });
+              } catch {}
+            }
+          }
+        }
+      }
+
+      if (lastError) {
+        dispatch({ type: 'SET_NODE_STATUS', payload: { id: selectedNode.id, status: 'error', error: lastError } });
+        setTestResult({ status: 'error', message: lastError });
+      } else {
+        dispatch({ type: 'SET_NODE_STATUS', payload: { id: selectedNode.id, status: 'success', output: lastOutput } });
+        setTestResult({ 
+          status: 'success', 
+          message: 'Node executed successfully!',
+          data: lastOutput 
+        });
+      }
+    } catch (err: any) {
+      const msg = err.message || 'Test failed';
+      dispatch({ type: 'SET_NODE_STATUS', payload: { id: selectedNode.id, status: 'error', error: msg } });
+      setTestResult({ status: 'error', message: msg });
+    } finally {
+      setTesting(false);
+    }
+  };
 
   const updateConfig = (key: string, value: unknown) => {
     dispatch({
@@ -81,10 +165,42 @@ export default function NodeConfigPanel() {
 
       {/* Actions bar */}
       <div className="flex items-center gap-1 px-4 py-2 border-b border-[var(--border)]">
-        <ActionBtn icon={<Play className="w-3 h-3" />} label="Test" onClick={() => {}} />
+        <ActionBtn 
+          icon={testing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />} 
+          label={testing ? "Running..." : "Test"} 
+          onClick={testNode} 
+        />
         <ActionBtn icon={<Copy className="w-3 h-3" />} label="Duplicate" onClick={duplicateNode} />
         <ActionBtn icon={<Trash2 className="w-3 h-3" />} label="Delete" onClick={deleteNode} destructive />
       </div>
+
+      {/* Test result banner */}
+      {testResult && (
+        <div className={`mx-4 mt-2 p-3 rounded-lg border text-xs ${
+          testResult.status === 'success' 
+            ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' 
+            : 'bg-red-500/10 border-red-500/20 text-red-400'
+        }`}>
+          <div className="flex items-center gap-2 mb-1">
+            {testResult.status === 'success' 
+              ? <CheckCircle className="w-3.5 h-3.5" /> 
+              : <AlertCircle className="w-3.5 h-3.5" />}
+            <span className="font-medium">{testResult.status === 'success' ? 'Test Passed' : 'Test Failed'}</span>
+            <button 
+              onClick={() => setTestResult(null)} 
+              className="ml-auto text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+          <p className="text-[10px] opacity-80">{testResult.message}</p>
+          {testResult.data && (
+            <pre className="mt-2 p-2 rounded bg-black/20 text-[9px] font-mono overflow-x-auto max-h-[120px] overflow-y-auto">
+              {typeof testResult.data === 'string' ? testResult.data : JSON.stringify(testResult.data, null, 2)}
+            </pre>
+          )}
+        </div>
+      )}
 
       {/* Config fields */}
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">

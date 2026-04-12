@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
+import { supabase } from '@/lib/supabase';
 import { 
   Zap, MessageSquare, GitBranch, Eye, ArrowRight, 
   Bot, Workflow, Play, Shield, Clock, Mail,
@@ -146,6 +147,7 @@ const stats = [
 /* ───────── component ───────── */
 export default function LandingPage() {
   const [mounted, setMounted] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const heroSection = useInView(0.1);
   const previewSection = useInView(0.1);
   const howSection = useInView(0.1);
@@ -156,6 +158,17 @@ export default function LandingPage() {
 
   const demo = useLiveDemo(previewSection.visible);
   useEffect(() => { setMounted(true); }, []);
+
+  // Check auth state
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setIsLoggedIn(!!session?.user);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsLoggedIn(!!session?.user);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
   return (
     <div className="min-h-screen bg-[var(--color-bg)] text-[var(--color-text)] overflow-x-hidden">
@@ -188,20 +201,36 @@ export default function LandingPage() {
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <Link
-                href="/signin"
-                className="px-5 py-2 text-sm text-white/50 hover:text-white/80 transition-colors duration-300"
-              >
-                Sign In
-              </Link>
-              <Link
-                href="/signup"
-                className="group relative px-5 py-2 text-sm font-medium text-white rounded-xl overflow-hidden transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/20"
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-indigo-600 transition-opacity duration-300" />
-                <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                <span className="relative">Get Started Free</span>
-              </Link>
+              {isLoggedIn ? (
+                <Link
+                  href="/dashboard"
+                  className="group relative px-5 py-2 text-sm font-medium text-white rounded-xl overflow-hidden transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/20"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-indigo-600 transition-opacity duration-300" />
+                  <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                  <span className="relative flex items-center gap-1.5">
+                    Dashboard
+                    <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform duration-300" />
+                  </span>
+                </Link>
+              ) : (
+                <>
+                  <Link
+                    href="/signin"
+                    className="px-5 py-2 text-sm text-white/50 hover:text-white/80 transition-colors duration-300"
+                  >
+                    Sign In
+                  </Link>
+                  <Link
+                    href="/signup"
+                    className="group relative px-5 py-2 text-sm font-medium text-white rounded-xl overflow-hidden transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/20"
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-indigo-600 transition-opacity duration-300" />
+                    <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                    <span className="relative">Get Started Free</span>
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         </div>

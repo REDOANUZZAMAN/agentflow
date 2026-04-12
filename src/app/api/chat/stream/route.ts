@@ -206,38 +206,56 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        // Smart grid position calculator (Bug 2 fix)
+        // Smart grid position calculator — uses sequential column index per type
         const COL_W = 280;
         const ROW_H = 180;
         function calcPosition(type: string, config: any): { x: number; y: number } {
-          const existingAddNodes = allToolCalls.filter(c => c.name === 'add_node');
+          const existingAddNodes = allToolCalls.filter(c => c.name === 'add_node' && c.result && !c.result.duplicate && !c.result.rejected);
+          // Count how many of the SAME type already exist (including pre-existing canvas nodes)
+          const existingCanvasOfType = (nodes || []).filter((n: any) => n.data?.type === type).length;
+
           switch (type) {
             case 'manual_trigger':
             case 'schedule_trigger':
             case 'webhook_trigger':
               return { x: 500, y: 0 };
             case 'element_reference': {
-              const elemIdx = existingAddNodes.filter(c => c.result?.type === 'element_reference').length;
+              const elemIdx = existingAddNodes.filter(c => c.result?.type === 'element_reference').length + existingCanvasOfType;
               return { x: 150 + elemIdx * COL_W, y: ROW_H };
             }
-            case 'photo_generator': {
-              const shot = config?.shotNumber || 1;
-              return { x: 150 + (shot - 1) * COL_W, y: 2 * ROW_H };
+            case 'photo_generator':
+            case 'image_gen': {
+              // Use sequential column index — each new photo goes to next column
+              const colIdx = existingAddNodes.filter(c => c.result?.type === type).length + existingCanvasOfType;
+              return { x: 150 + colIdx * COL_W, y: 2 * ROW_H };
             }
             case 'video_generator':
             case 'video_gen': {
-              const shot = config?.shotNumber || 1;
-              return { x: 150 + (shot - 1) * COL_W, y: 3 * ROW_H };
+              const colIdx = existingAddNodes.filter(c => c.result?.type === type || c.result?.type === 'video_gen').length + existingCanvasOfType;
+              return { x: 150 + colIdx * COL_W, y: 3 * ROW_H };
             }
             case 'voiceover_generator':
             case 'voice_gen': {
-              const shot = config?.shotNumber || 1;
-              return { x: 150 + (shot - 1) * COL_W, y: 4 * ROW_H };
+              const colIdx = existingAddNodes.filter(c => c.result?.type === type || c.result?.type === 'voice_gen').length + existingCanvasOfType;
+              return { x: 150 + colIdx * COL_W, y: 4 * ROW_H };
             }
-            case 'project_orchestrator':
-              return { x: 500, y: 5 * ROW_H };
-            case 'final_video_compiler':
-              return { x: 500, y: 6 * ROW_H };
+            case 'project_orchestrator': {
+              // Center orchestrator based on how many columns we have
+              const maxCols = Math.max(
+                existingAddNodes.filter(c => c.result?.type === 'photo_generator').length,
+                existingAddNodes.filter(c => ['video_generator', 'video_gen'].includes(c.result?.type)).length,
+                1
+              );
+              return { x: 150 + Math.floor((maxCols - 1) / 2) * COL_W, y: 5 * ROW_H };
+            }
+            case 'final_video_compiler': {
+              const maxCols = Math.max(
+                existingAddNodes.filter(c => c.result?.type === 'photo_generator').length,
+                existingAddNodes.filter(c => ['video_generator', 'video_gen'].includes(c.result?.type)).length,
+                1
+              );
+              return { x: 150 + Math.floor((maxCols - 1) / 2) * COL_W, y: 6 * ROW_H };
+            }
             default: {
               const idx = existingAddNodes.length;
               return { x: 300, y: 80 + idx * 150 };

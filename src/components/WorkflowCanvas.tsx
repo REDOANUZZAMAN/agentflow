@@ -23,6 +23,7 @@ import { useApp } from '@/lib/context';
 import { createNode, createEdge } from '@/lib/store';
 import { getNodeMeta, type NodeType } from '@/lib/types';
 import WorkflowNodeComponent from './WorkflowNode';
+import { NodeIcon } from '@/lib/node-icons';
 import { FloatingTaskWidget } from './TaskListCard';
 import CanvasContextMenu, { getCanvasMenuItems, getNodeMenuItems } from './CanvasContextMenu';
 
@@ -374,7 +375,7 @@ function WorkflowCanvasInner() {
       {state.nodes.length === 0 && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="text-center max-w-sm">
-            <div className="text-6xl mb-4">🎨</div>
+            <div className="text-6xl mb-4 flex justify-center"><svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--muted-foreground)] opacity-40"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg></div>
             <h3 className="text-lg font-semibold text-[var(--foreground)] mb-2">Your canvas is empty</h3>
             <p className="text-sm text-[var(--muted-foreground)]">
               Drag a node from the sidebar, right-click to add, or ask the AI in chat!
@@ -442,7 +443,7 @@ function QuickNodePicker({ position, onSelect, onClose }: {
             onClick={() => onSelect(node.type)}
             className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-[var(--foreground)] hover:bg-[var(--secondary)] rounded-lg transition-colors"
           >
-            <span>{node.emoji}</span>
+            <NodeIcon type={node.type} className="w-3.5 h-3.5" />
             <span className="font-medium">{node.label}</span>
             <span className="text-[10px] text-[var(--muted-foreground)] ml-auto">{node.category}</span>
           </button>

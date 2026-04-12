@@ -65,7 +65,7 @@ export default function ProjectGallery({ manifest, onClose }: ProjectGalleryProp
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)] bg-[var(--card)]">
           <div>
-            <h2 className="text-sm font-bold text-[var(--foreground)]">🎬 {manifest.title}</h2>
+            <h2 className="text-sm font-bold text-[var(--foreground)]">{manifest.title}</h2>
             <p className="text-[10px] text-[var(--muted-foreground)]">
               {elements.length} elements • {scenes.length} scenes • {scenes.reduce((s, sc) => s + sc.shots.length, 0)} shots
               {manifest.totalCost ? ` • $${manifest.totalCost.toFixed(2)}` : ''}

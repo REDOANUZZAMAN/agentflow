@@ -21,7 +21,7 @@ export default function WorkflowNodeComponent(props: NodeProps) {
   // Access data from props - React Flow v12 passes data as Record<string, unknown>
   const data = props.data || {};
   const status = (data.status as string) || 'idle';
-  const emoji = (data.emoji as string) || '❓';
+  const emoji = (data.emoji as string) || '?';
   const label = (data.label as string) || 'Node';
   const type = (data.type as string) || 'unknown';
   const error = data.error as string | undefined;

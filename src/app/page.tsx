@@ -29,41 +29,51 @@ function useInView(threshold = 0.15) {
 
 /* ───────── live demo timeline hook ───────── */
 function useLiveDemo(startVisible: boolean) {
+  const stageRef = useRef(0);
   const [stage, setStage] = useState(0);
   const [typedText, setTypedText] = useState('');
+  const typingStarted = useRef(false);
   const fullText = 'Send me a daily joke by email every morning';
+
+  // Helper to advance stage (prevents going backwards)
+  const advanceTo = (next: number) => {
+    if (stageRef.current < next) {
+      stageRef.current = next;
+      setStage(next);
+    }
+  };
   
   useEffect(() => {
-    if (!startVisible) return;
-    // Stage 0: start typing (after 400ms)
-    const t0 = setTimeout(() => setStage(1), 400);
+    if (!startVisible || stageRef.current > 0) return;
+    const t0 = setTimeout(() => advanceTo(1), 400);
     return () => clearTimeout(t0);
   }, [startVisible]);
   
-  // Typewriter effect
+  // Typewriter effect — only runs once
   useEffect(() => {
-    if (stage < 1) return;
+    if (stage !== 1 || typingStarted.current) return;
+    typingStarted.current = true;
     let i = 0;
     const id = setInterval(() => {
       i++;
       setTypedText(fullText.slice(0, i));
       if (i >= fullText.length) {
         clearInterval(id);
-        setTimeout(() => setStage(2), 600);  // AI starts responding
+        setTimeout(() => advanceTo(2), 600);
       }
     }, 35);
     return () => clearInterval(id);
   }, [stage]);
   
-  // Progress through demo stages
+  // Progress through demo stages — each fires once
   useEffect(() => {
-    if (stage === 2) { const t = setTimeout(() => setStage(3), 800); return () => clearTimeout(t); }  // show node 1
-    if (stage === 3) { const t = setTimeout(() => setStage(4), 700); return () => clearTimeout(t); }  // show connection 1
-    if (stage === 4) { const t = setTimeout(() => setStage(5), 600); return () => clearTimeout(t); }  // show node 2
-    if (stage === 5) { const t = setTimeout(() => setStage(6), 700); return () => clearTimeout(t); }  // show connection 2
-    if (stage === 6) { const t = setTimeout(() => setStage(7), 600); return () => clearTimeout(t); }  // show node 3
-    if (stage === 7) { const t = setTimeout(() => setStage(8), 800); return () => clearTimeout(t); }  // show inspector
-    if (stage === 8) { const t = setTimeout(() => setStage(9), 600); return () => clearTimeout(t); }  // show buttons
+    if (stage === 2) { const t = setTimeout(() => advanceTo(3), 800); return () => clearTimeout(t); }
+    if (stage === 3) { const t = setTimeout(() => advanceTo(4), 700); return () => clearTimeout(t); }
+    if (stage === 4) { const t = setTimeout(() => advanceTo(5), 600); return () => clearTimeout(t); }
+    if (stage === 5) { const t = setTimeout(() => advanceTo(6), 700); return () => clearTimeout(t); }
+    if (stage === 6) { const t = setTimeout(() => advanceTo(7), 600); return () => clearTimeout(t); }
+    if (stage === 7) { const t = setTimeout(() => advanceTo(8), 800); return () => clearTimeout(t); }
+    if (stage === 8) { const t = setTimeout(() => advanceTo(9), 600); return () => clearTimeout(t); }
   }, [stage]);
   
   return { stage, typedText };

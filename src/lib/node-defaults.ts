@@ -66,8 +66,9 @@ export const NODE_SCHEMAS: Record<string, NodeSchema> = {
   voiceover_generator: {
     required: ['text'],
     defaults: {
+      text: '',
       voice: 'Rachel',
-      model: 'fal-ai/elevenlabs/tts',
+      model: 'fal-ai/elevenlabs/text-to-dialogue/eleven-v3',
     },
   },
   music_generator: {

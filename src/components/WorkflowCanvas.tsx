@@ -76,7 +76,9 @@ function WorkflowCanvasInner() {
       setRfEdges(state.edges.map((e) => ({
         id: e.id, source: e.source, target: e.target,
         sourceHandle: e.sourceHandle, targetHandle: e.targetHandle,
-        animated: state.isRunning, style: { stroke: '#6366f1', strokeWidth: 2 },
+        type: 'smoothstep',
+        animated: false,
+        style: { stroke: '#6366f1', strokeWidth: 2 },
       })));
     }
   }, [state.nodes, state.edges, state.isRunning, setRfNodes, setRfEdges, fitView]);
@@ -101,7 +103,7 @@ function WorkflowCanvasInner() {
       const edge = createEdge(connection.source, connection.target);
       dispatch({ type: 'ADD_EDGE', payload: edge });
       setRfEdges((eds) => addEdge({
-        ...connection, id: edge.id, animated: state.isRunning,
+        ...connection, id: edge.id, type: 'smoothstep', animated: false,
         style: { stroke: '#6366f1', strokeWidth: 2 },
       }, eds));
     }

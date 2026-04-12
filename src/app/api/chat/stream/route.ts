@@ -20,7 +20,7 @@ CORRECT pattern:
   add_node(element2)
   add_node(photo for shot 1, config: {sceneNumber:1, shotNumber:1})
   add_node(video for shot 1, config: {sceneNumber:1, shotNumber:1})
-  add_node(voiceover for shot 1, config: {sceneNumber:1, shotNumber:1})
+  add_node(voiceover for shot 1, config: {sceneNumber:1, shotNumber:1, text:"The narration dialogue for this shot...", voice:"Rachel"})
   add_node(photo for shot 2, config: {sceneNumber:1, shotNumber:2})
   ...
   add_node(orchestrator)
@@ -47,6 +47,10 @@ For a script with N shots, create EXACTLY:
 
 Each shot node MUST include sceneNumber and shotNumber in its config:
   add_node(type: "photo_generator", config: { sceneNumber: 1, shotNumber: 3, prompt: "..." })
+
+CRITICAL: voiceover_generator nodes MUST include "text" with the actual narration/dialogue for that shot.
+  add_node(type: "voiceover_generator", config: { sceneNumber: 1, shotNumber: 1, text: "The actual narration text for this scene...", voice: "Rachel" })
+If the user's script has dialogue, use it. If not, write appropriate narration based on the scene description.
 
 NEVER create two photo_generator nodes with the same sceneNumber+shotNumber.
 NEVER create two video_generator nodes with the same sceneNumber+shotNumber.

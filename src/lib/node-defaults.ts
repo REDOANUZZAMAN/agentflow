@@ -85,13 +85,15 @@ export const NODE_SCHEMAS: Record<string, NodeSchema> = {
       projectName: 'Video Project',
       photoModel: 'fal-ai/nano-banana-2',
       videoModel: 'fal-ai/kling-video/o3/pro/image-to-video',
-      voiceModel: 'fal-ai/elevenlabs/tts',
+      voiceModel: 'fal-ai/elevenlabs/text-to-dialogue/eleven-v3',
+      cloudinaryFolder: '',
     },
     runtimeFills: ['cloudinaryFolder'],
   },
   final_video_compiler: {
     required: [],
     defaults: {
+      projectId: '',
       transition: 'cut',
       outputResolution: '1920x1080',
       outputFormat: 'mp4',

@@ -425,7 +425,7 @@ function getConfigFields(type: NodeType | string): FieldDef[] {
       ];
     case 'final_video_compiler':
       return [
-        { key: 'projectId', label: 'Project ID', type: 'text', placeholder: 'proj_phishing_001', required: true },
+        { key: 'projectId', label: 'Project ID', type: 'text', placeholder: 'Auto-generated at runtime', required: false },
         { key: 'transition', label: 'Transition', type: 'select', options: [
           { value: 'cut', label: 'Cut (instant)' }, { value: 'fade', label: 'Fade' },
           { value: 'dissolve', label: 'Dissolve' }, { value: 'wipe', label: 'Wipe' },

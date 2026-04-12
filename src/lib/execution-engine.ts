@@ -155,21 +155,37 @@ async function executeElementReference(node: WorkflowNode, ctx: ExecutionContext
 async function executePhotoGenerator(node: WorkflowNode, ctx: ExecutionContext) {
   initFal();
   const { prompt, negative_prompt, model, scene_number, shot_number, sceneNumber, shotNumber } = node.data.config;
+  
+  // CONNECTIONS ARE THE ONLY SOURCE OF TRUTH for element references
+  // Never read from config.elementRefs — only from upstream graph edges
   const elementRefs = getUpstream(ctx, node.id, 'element_reference');
   const hasRefs = elementRefs.length > 0;
+  const referenceUrls = elementRefs.map((r: any) => r.imageUrl).filter(Boolean);
+  
+  ctx.emit({ type: 'log', nodeId: node.id, data: { 
+    message: `📸 Found ${elementRefs.length} connected element refs: ${elementRefs.map((r: any) => r.elementName || 'unnamed').join(', ') || 'none'}` 
+  }});
+  
   const falModel = model || pickImageModel(hasRefs, elementRefs.length, false);
   // Accept both snake_case and camelCase config keys
   const sceneNum = scene_number || sceneNumber || 1;
   const shotNum = shot_number || shotNumber || 1;
   const finalPrompt = prompt || 'A beautiful scene';
 
-  // Fix 4: Validate prompt
+  // Validate prompt
   if (!finalPrompt || finalPrompt.trim().length < 3) {
     throw new Error(`Photo prompt is empty or too short: "${finalPrompt}". Provide a descriptive prompt.`);
   }
   
-  ctx.emit({ type: 'log', nodeId: node.id, data: { message: `📸 Generating photo for Scene ${sceneNum}, Shot ${shotNum}...` } });
-  ctx.emit({ type: 'api_call', nodeId: node.id, data: { service: 'fal.ai', model: falModel, prompt: finalPrompt } });
+  // Validate: edit model requires connected element refs
+  if (falModel.includes('/edit') && referenceUrls.length === 0) {
+    ctx.emit({ type: 'log', nodeId: node.id, data: { 
+      message: `⚠️ Edit model ${falModel} requires connected Element Reference nodes but found none. Falling back to non-edit model.` 
+    }});
+  }
+  
+  ctx.emit({ type: 'log', nodeId: node.id, data: { message: `📸 Generating photo for Scene ${sceneNum}, Shot ${shotNum} via ${falModel}...` } });
+  ctx.emit({ type: 'api_call', nodeId: node.id, data: { service: 'fal.ai', model: falModel, prompt: finalPrompt, elementRefs: referenceUrls.length } });
 
   const input: any = {
     prompt: finalPrompt,
@@ -178,6 +194,14 @@ async function executePhotoGenerator(node: WorkflowNode, ctx: ExecutionContext) 
     enable_safety_checker: false,
   };
   if (negative_prompt) input.negative_prompt = negative_prompt;
+  
+  // Pass element reference images to fal.ai for /edit models
+  if (referenceUrls.length > 0 && falModel.includes('/edit')) {
+    input.image_urls = referenceUrls;
+    ctx.emit({ type: 'log', nodeId: node.id, data: { 
+      message: `🔗 Passing ${referenceUrls.length} reference image(s) to ${falModel}` 
+    }});
+  }
 
   // Fix 4: Log full request body on error
   let result: any;

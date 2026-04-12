@@ -145,7 +145,7 @@ function ActionBtn({ icon, label, onClick, destructive }: {
 interface FieldDef {
   key: string;
   label: string;
-  type: 'text' | 'textarea' | 'number' | 'toggle' | 'select' | 'json';
+  type: 'text' | 'textarea' | 'number' | 'toggle' | 'select' | 'json' | 'readonly_connections';
   placeholder?: string;
   options?: { value: string; label: string }[];
   required?: boolean;
@@ -232,6 +232,17 @@ function ConfigField({ field, value, onChange }: { field: FieldDef; value: unkno
         </div>
       );
     }
+    case 'readonly_connections':
+      return (
+        <div className="border border-dashed border-[var(--border)] rounded-lg p-3 bg-[var(--card)]/50">
+          <label className="text-[11px] font-medium text-[var(--muted-foreground)] mb-1 block">
+            🔗 {field.label}
+          </label>
+          <p className="text-[10px] text-[var(--muted-foreground)] leading-relaxed">
+            {field.placeholder}
+          </p>
+        </div>
+      );
     default:
       return null;
   }
@@ -362,7 +373,7 @@ function getConfigFields(type: NodeType | string): FieldDef[] {
         ]},
         { key: 'width', label: 'Width', type: 'number', placeholder: '1920' },
         { key: 'height', label: 'Height', type: 'number', placeholder: '1080' },
-        { key: 'elementRefs', label: 'Element References (comma-separated)', type: 'text', placeholder: '@Hacker, @HackerRoom' },
+        { key: '_connectedElements', label: 'Connected Element References', type: 'readonly_connections', placeholder: 'Connect Element Reference nodes on the canvas → they will be used automatically at run time.' },
       ];
     case 'video_generator':
       return [

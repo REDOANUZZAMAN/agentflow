@@ -37,11 +37,13 @@ export async function POST(req: NextRequest) {
   }
 
   // Create execution record in Supabase (if we have workflowId + userId)
-  let executionId: string | null = null;
+  // ALWAYS generate a local executionId so assets are grouped per-run
+  const localExecId = `exec_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  let executionId: string = localExecId;
   const startedAt = new Date();
   if (workflowId && userId) {
     try {
-      const { data: execRow } = await supabaseAdmin.from('executions').insert({
+      const { data: execRow, error: execErr } = await supabaseAdmin.from('executions').insert({
         workflow_id: workflowId,
         user_id: userId,
         status: 'running',
@@ -49,9 +51,13 @@ export async function POST(req: NextRequest) {
         steps: [],
         cost: 0,
       }).select('id').single();
-      if (execRow) executionId = execRow.id;
+      if (execRow?.id) {
+        executionId = execRow.id;
+      } else {
+        console.warn('Execution insert returned no id, using local:', localExecId, execErr);
+      }
     } catch (err) {
-      console.warn('Could not create execution record:', err);
+      console.warn('Could not create execution record, using local id:', localExecId, err);
     }
   }
 

@@ -193,10 +193,11 @@ export default function ChatPanel() {
                 } else if (data.type === 'api_call') {
                   dispatch({ type: 'ADD_EXECUTION_EVENT', payload: { id: `evt_${Date.now()}_api`, timestamp: new Date(data.timestamp), type: 'api_call', nodeId: data.nodeId, data: data.data } });
                 } else if (data.type === 'asset_created') {
-                  dispatch({ type: 'ADD_EXECUTION_EVENT', payload: { id: `evt_${Date.now()}_asset`, timestamp: new Date(data.timestamp), type: 'log', nodeId: data.nodeId, data: { message: `✅ Asset created: ${data.data?.type} — ${data.data?.url?.substring(0, 60)}...` } } });
+                  dispatch({ type: 'ADD_EXECUTION_EVENT', payload: { id: `evt_${Date.now()}_asset`, timestamp: new Date(data.timestamp), type: 'asset_created', nodeId: data.nodeId, data: data.data } });
                   dispatch({ type: 'ADD_TERMINAL_LOG', payload: { id: `tl_${Date.now()}`, timestamp: new Date(data.timestamp), level: 'run', message: `🎨 ${data.data?.type}: ${data.data?.url}` } });
                 } else if (data.type === 'workflow_done') {
-                  dispatch({ type: 'ADD_EXECUTION_EVENT', payload: { id: `evt_${Date.now()}_done`, timestamp: new Date(data.timestamp), type: 'log', data: { message: `✅ Workflow done! Cost: $${data.data?.totalCost}, ${data.data?.assetCount} assets` } } });
+                  dispatch({ type: 'ADD_EXECUTION_EVENT', payload: { id: `evt_${Date.now()}_done`, timestamp: new Date(data.timestamp), type: 'workflow_done', data: data.data } });
+                  dispatch({ type: 'ADD_TERMINAL_LOG', payload: { id: `tl_${Date.now()}`, timestamp: new Date(data.timestamp), level: 'run', message: `✅ Workflow done! Cost: $${data.data?.totalCost}, ${data.data?.assetCount} assets` } });
                 }
               } else if (currentEvent === 'result') {
                 resultData = data;

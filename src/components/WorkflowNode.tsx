@@ -108,7 +108,7 @@ export default function WorkflowNodeComponent(props: NodeProps) {
       </div>
 
       {/* Config summary */}
-      <div className="px-4 py-2 text-[11px] text-[var(--muted-foreground)]">
+      <div className="px-4 py-2 text-[11px] text-[var(--muted-foreground)] overflow-hidden break-words line-clamp-2 max-h-[3.5em]">
         {getConfigSummary(type, config)}
       </div>
 
@@ -165,11 +165,19 @@ function getNodeDescription(type: string, config: Record<string, unknown>): stri
 }
 
 function getConfigSummary(type: string, config: Record<string, unknown>): string {
-  const entries = Object.entries(config);
+  const entries = Object.entries(config).filter(([, v]) => v !== undefined && v !== null && v !== '');
   if (entries.length === 0) return '⚙️ Click to configure';
+  
+  // Show at most 2 fields, each truncated to 30 chars max
+  const truncate = (s: string, max: number) => s.length > max ? s.slice(0, max) + '…' : s;
   
   return entries
     .slice(0, 2)
-    .map(([key, val]) => `${key}: ${typeof val === 'string' ? val.slice(0, 25) : JSON.stringify(val)}`)
+    .map(([key, val]) => {
+      const display = typeof val === 'string' 
+        ? truncate(val, 30) 
+        : truncate(JSON.stringify(val), 30);
+      return `${key}: ${display}`;
+    })
     .join(' • ');
 }

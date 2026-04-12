@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { X, Play, Trash2, Copy, EyeOff, Eye, HelpCircle, StickyNote, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { useApp } from '@/lib/context';
 import { getNodeMeta, type NodeType } from '@/lib/types';
+import { NodeIcon } from '@/lib/node-icons';
 
 export default function NodeConfigPanel() {
   const { state, dispatch } = useApp();
@@ -145,7 +146,7 @@ export default function NodeConfigPanel() {
     <div className="flex flex-col h-full bg-[var(--background)]">
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--border)]">
-        <span className="text-xl">{selectedNode.data.emoji}</span>
+        <span className="flex items-center justify-center w-9 h-9 rounded-lg bg-[var(--secondary)]"><NodeIcon type={selectedNode.data.type} className="w-5 h-5 text-[var(--foreground)]" /></span>
         <div className="flex-1 min-w-0">
           <input
             type="text"

@@ -103,7 +103,7 @@ export default function ChatPanel() {
           dispatch({ type: 'FAIL_TASK', payload: { id: tool.input.task_id as string, reason: (tool.input.reason as string) || 'Unknown error' } });
         } else if (tool.name === 'workflow_ready') {
           // Workflow is complete — could show a notification
-          dispatch({ type: 'ADD_TERMINAL_LOG', payload: { id: `tl_ready_${Date.now()}`, timestamp: new Date(), level: 'run', message: `✅ Workflow ready: ${tool.input?.summary || 'Complete'}` } });
+          dispatch({ type: 'ADD_TERMINAL_LOG', payload: { id: `tl_ready_${Date.now()}`, timestamp: new Date(), level: 'run', message: `[OK] Workflow ready: ${tool.input?.summary || 'Complete'}` } });
         }
       }
     }, 300); // Small delay for visual effect
@@ -194,10 +194,10 @@ export default function ChatPanel() {
                   dispatch({ type: 'ADD_EXECUTION_EVENT', payload: { id: `evt_${Date.now()}_api`, timestamp: new Date(data.timestamp), type: 'api_call', nodeId: data.nodeId, data: data.data } });
                 } else if (data.type === 'asset_created') {
                   dispatch({ type: 'ADD_EXECUTION_EVENT', payload: { id: `evt_${Date.now()}_asset`, timestamp: new Date(data.timestamp), type: 'asset_created', nodeId: data.nodeId, data: data.data } });
-                  dispatch({ type: 'ADD_TERMINAL_LOG', payload: { id: `tl_${Date.now()}`, timestamp: new Date(data.timestamp), level: 'run', message: `🎨 ${data.data?.type}: ${data.data?.url}` } });
+                  dispatch({ type: 'ADD_TERMINAL_LOG', payload: { id: `tl_${Date.now()}`, timestamp: new Date(data.timestamp), level: 'run', message: `[Asset] ${data.data?.type}: ${data.data?.url}` } });
                 } else if (data.type === 'workflow_done') {
                   dispatch({ type: 'ADD_EXECUTION_EVENT', payload: { id: `evt_${Date.now()}_done`, timestamp: new Date(data.timestamp), type: 'workflow_done', data: data.data } });
-                  dispatch({ type: 'ADD_TERMINAL_LOG', payload: { id: `tl_${Date.now()}`, timestamp: new Date(data.timestamp), level: 'run', message: `✅ Workflow done! Cost: $${data.data?.totalCost}, ${data.data?.assetCount} assets` } });
+                  dispatch({ type: 'ADD_TERMINAL_LOG', payload: { id: `tl_${Date.now()}`, timestamp: new Date(data.timestamp), level: 'run', message: `[Done] Workflow complete! Cost: $${data.data?.totalCost}, ${data.data?.assetCount} assets` } });
                 }
               } else if (currentEvent === 'result') {
                 resultData = data;
@@ -218,9 +218,9 @@ export default function ChatPanel() {
         const images = assets.filter((a: any) => a.imageUrl);
         const videos = assets.filter((a: any) => a.videoUrl);
         
-        let summary = `✅ **Workflow complete!**\n\n`;
-        summary += `💰 Total cost: $${resultData.totalCost || 0}\n`;
-        summary += `📊 ${assets.length} assets created\n\n`;
+        let summary = `**Workflow complete!**\n\n`;
+        summary += `**Cost:** $${resultData.totalCost || 0}\n`;
+        summary += `**Assets:** ${assets.length} created\n\n`;
         
         if (images.length > 0) {
           summary += `**Images:**\n`;
@@ -241,15 +241,15 @@ export default function ChatPanel() {
           content: summary,
           timestamp: new Date(),
           buttons: [
-            { label: '🔄 Run Again', action: 'Run the workflow again' },
-            { label: '📂 View Assets', action: 'Show me all the generated assets' },
+            { label: 'Run Again', action: 'Run the workflow again' },
+            { label: 'View Assets', action: 'Show me all the generated assets' },
           ],
         });
       }
 
     } catch (err: any) {
       dispatch({ type: 'ADD_EXECUTION_EVENT', payload: { id: `evt_err_${Date.now()}`, timestamp: new Date(), type: 'error', data: { message: err.message || 'Execution failed' } } });
-      addMessage({ id: uuidv4(), role: 'assistant', content: `❌ Execution failed: ${err.message}`, timestamp: new Date() });
+      addMessage({ id: uuidv4(), role: 'assistant', content: `**Execution failed:** ${err.message}`, timestamp: new Date() });
     } finally {
       dispatch({ type: 'SET_RUNNING', payload: false });
     }
@@ -352,7 +352,7 @@ export default function ChatPanel() {
         } else if (tool.name === 'fail_task' && tool.input?.task_id) {
           dispatch({ type: 'FAIL_TASK', payload: { id: tool.input.task_id as string, reason: (tool.input.reason as string) || 'Unknown error' } });
         } else if (tool.name === 'workflow_ready') {
-          dispatch({ type: 'ADD_TERMINAL_LOG', payload: { id: `tl_ready_${Date.now()}`, timestamp: new Date(), level: 'run', message: `✅ Workflow ready: ${tool.input?.summary || 'Complete'}` } });
+          dispatch({ type: 'ADD_TERMINAL_LOG', payload: { id: `tl_ready_${Date.now()}`, timestamp: new Date(), level: 'run', message: `[OK] Workflow ready: ${tool.input?.summary || 'Complete'}` } });
         } else if (tool.name === 'delete_node') {
           const nodeId = streamNodeIdMap[tool.input.node_id] || tool.input.node_id;
           dispatch({ type: 'DELETE_NODE', payload: nodeId });
@@ -418,7 +418,7 @@ export default function ChatPanel() {
       const aiMsg: ChatMessage = {
         id: uuidv4(),
         role: 'assistant',
-        content: streamText || '✨ Workflow built!',
+        content: streamText || '**Workflow built!**',
         timestamp: new Date(),
         toolCalls: streamToolCalls.filter(tc => !['start_task', 'complete_task', 'create_task_list', 'fail_task', 'workflow_ready'].includes(tc.name)).map((tc: any) => ({
           id: tc.id,
@@ -435,7 +435,7 @@ export default function ChatPanel() {
       const errorMsg: ChatMessage = {
         id: uuidv4(),
         role: 'assistant',
-        content: "😅 Oops, something went wrong on my end. Could you try again? If the problem persists, check that your API key is set up correctly in `.env.local`.",
+        content: "Oops, something went wrong on my end. Could you try again? If the problem persists, check that your API key is set up correctly in `.env.local`.",
         timestamp: new Date(),
       };
       addMessage(errorMsg);
@@ -635,7 +635,7 @@ function MessageBubble({ message, onButtonClick }: { message: ChatMessage; onBut
               </div>
             </div>
             <div className="px-3 py-2 flex items-center justify-between bg-[var(--card)]">
-              <span className="text-[11px] text-[var(--foreground)] font-medium">{message.videoLabel || '🎬 Final Video'}</span>
+              <span className="text-[11px] text-[var(--foreground)] font-medium">{message.videoLabel || 'Final Video'}</span>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] text-[var(--muted-foreground)]">1080p MP4</span>
                 <button className="text-[10px] px-2 py-0.5 rounded bg-[var(--primary)] text-white hover:opacity-90 transition-opacity">

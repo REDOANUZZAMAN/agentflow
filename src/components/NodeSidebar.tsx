@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Search, ChevronDown, ChevronRight, GripVertical } from 'lucide-react';
 import { NODE_CATEGORIES, type NodeType } from '@/lib/types';
+import { NodeIcon, CategoryIcon } from '@/lib/node-icons';
 
 interface NodeSidebarProps {
   onDragStart: (type: NodeType) => void;
@@ -37,7 +38,7 @@ export default function NodeSidebar({ onDragStart }: NodeSidebarProps) {
     <div className="flex flex-col h-full bg-[var(--background)]">
       {/* Header */}
       <div className="px-4 py-3 border-b border-[var(--border)]">
-        <h2 className="text-sm font-semibold text-[var(--foreground)] mb-2">🧩 Node Library</h2>
+        <h2 className="text-sm font-semibold text-[var(--foreground)] mb-2">Node Library</h2>
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--muted-foreground)]" />
           <input
@@ -53,7 +54,7 @@ export default function NodeSidebar({ onDragStart }: NodeSidebarProps) {
       {/* Tooltip for first-timers */}
       {showTooltip && (
         <div className="mx-3 mt-3 px-3 py-2 bg-[var(--primary)]/10 border border-[var(--primary)]/20 rounded-lg text-xs text-[var(--primary)]">
-          💡 <strong>Drag</strong> any node onto the canvas to add it!
+            <strong>Drag</strong> any node onto the canvas to add it!
         </div>
       )}
 
@@ -70,7 +71,7 @@ export default function NodeSidebar({ onDragStart }: NodeSidebarProps) {
               ) : (
                 <ChevronDown className="w-3 h-3" />
               )}
-              <span>{cat.emoji}</span>
+              <CategoryIcon name={cat.name} className="w-3.5 h-3.5" />
               <span>{cat.name}</span>
               <span className="ml-auto text-[10px] text-[var(--muted-foreground)]/60">
                 {cat.types.length}
@@ -88,7 +89,7 @@ export default function NodeSidebar({ onDragStart }: NodeSidebarProps) {
                     title={nodeType.description}
                   >
                     <GripVertical className="w-3 h-3 text-[var(--muted-foreground)]/30 group-hover:text-[var(--muted-foreground)]/60 flex-shrink-0" />
-                    <span className="text-base">{nodeType.emoji}</span>
+                    <span className="flex items-center justify-center w-7 h-7 rounded-md bg-[var(--secondary)]"><NodeIcon type={nodeType.type} className="w-3.5 h-3.5 text-[var(--foreground)]" /></span>
                     <div className="min-w-0">
                       <p className="text-xs font-medium text-[var(--foreground)] truncate">
                         {nodeType.label}

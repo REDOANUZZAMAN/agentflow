@@ -3,6 +3,7 @@
 import React from 'react';
 import { Handle, Position, type NodeProps, type Node } from '@xyflow/react';
 import { CheckCircle2, XCircle, Loader2, HelpCircle } from 'lucide-react';
+import { NodeIcon } from '@/lib/node-icons';
 
 // Define node data type
 type WorkflowNodeData = Node<{
@@ -91,7 +92,7 @@ export default function WorkflowNodeComponent(props: NodeProps) {
       {/* Node content */}
       <div className={`bg-gradient-to-br ${bgGradient} rounded-t-[10px] px-4 py-3`}>
         <div className="flex items-center gap-2">
-          <span className="text-xl">{emoji}</span>
+          <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-white/10"><NodeIcon type={type} className="w-4.5 h-4.5 text-[var(--foreground)]" /></span>
           <div className="flex-1 min-w-0">
             <h3 className="text-sm font-semibold text-[var(--foreground)] truncate">{label}</h3>
             <p className="text-[10px] text-[var(--muted-foreground)] truncate">

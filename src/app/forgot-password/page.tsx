@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import Link from 'next/link';
+import { Zap, Mail } from 'lucide-react';
 
 const supabase = createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 
@@ -21,7 +22,7 @@ export default function ForgotPasswordPage() {
   if (sent) return (
     <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center p-4">
       <div className="w-full max-w-md bg-[#12121a] border border-white/10 rounded-2xl p-8 text-center">
-        <div className="text-5xl mb-4">📬</div>
+        <div className="mb-4 flex justify-center"><Mail className="w-12 h-12 text-violet-400" strokeWidth={1.5} /></div>
         <h2 className="text-2xl font-bold text-white mb-2">Check your email</h2>
         <p className="text-gray-400 mb-6">We sent a password reset link to <strong className="text-white">{email}</strong></p>
         <Link href="/signin" className="text-violet-400 hover:text-violet-300 text-sm">Back to sign in</Link>
@@ -32,7 +33,7 @@ export default function ForgotPasswordPage() {
   return (
     <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        <div className="text-center mb-8"><Link href="/" className="inline-flex items-center gap-2"><div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-xl flex items-center justify-center text-white font-bold text-lg">⚡</div><span className="text-white font-bold text-xl">AgentFlow</span></Link></div>
+        <div className="text-center mb-8"><Link href="/" className="inline-flex items-center gap-2"><div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-xl flex items-center justify-center"><Zap className="w-5 h-5 text-white" strokeWidth={2.5} /></div><span className="text-white font-bold text-xl">AgentFlow</span></Link></div>
         <div className="bg-[#12121a] border border-white/10 rounded-2xl p-8">
           <h1 className="text-2xl font-bold text-white mb-1">Reset password</h1>
           <p className="text-gray-400 mb-6">Enter your email and we&apos;ll send you a reset link</p>
@@ -47,7 +48,7 @@ export default function ForgotPasswordPage() {
             </button>
           </form>
         </div>
-        <p className="text-center text-sm text-gray-400 mt-6"><Link href="/signin" className="text-violet-400 hover:text-violet-300">← Back to sign in</Link></p>
+        <p className="text-center text-sm text-gray-400 mt-6"><Link href="/signin" className="text-violet-400 hover:text-violet-300">Back to sign in</Link></p>
       </div>
     </div>
   );

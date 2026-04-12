@@ -393,16 +393,33 @@ async function executeVideoGenerator(node: WorkflowNode, ctx: ExecutionContext) 
 
 async function executeVoiceoverGenerator(node: WorkflowNode, ctx: ExecutionContext) {
   initFal();
-  const { text, voice, model } = node.data.config;
+  const { text, voice, model, speed: configSpeed } = node.data.config;
   const voiceText = text || 'Hello, welcome to the video.';
   
   // Determine which model to use
   const isDialogueModel = model && model.includes('dialogue');
   const falModel = model || FAL_MODELS.VOICE_TTS; // Default to simple TTS, not dialogue
 
+  // Auto-calculate speech speed to fit within video duration
+  // Average English speech: ~2.5 words/second at speed=1.0
+  const WORDS_PER_SEC = 2.5;
+  const wordCount = voiceText.trim().split(/\s+/).length;
+  const naturalDuration = wordCount / WORDS_PER_SEC;
+  const targetDuration = node.data.config.targetDuration || node.data.config.duration || 5; // default 5s per shot
+  let autoSpeed = 1.0;
+  if (naturalDuration > targetDuration && targetDuration > 0) {
+    autoSpeed = Math.min(naturalDuration / targetDuration, 1.2); // ElevenLabs max is 1.2
+  }
+  const finalSpeed = configSpeed || (autoSpeed > 1.0 ? autoSpeed : undefined);
+
   ctx.emit({ type: 'log', nodeId: node.id, data: { 
     message: `🗣️ Generating voiceover via ${falModel}... Text: "${voiceText.substring(0, 80)}${voiceText.length > 80 ? '...' : ''}"` 
   }});
+  if (finalSpeed && finalSpeed > 1.0) {
+    ctx.emit({ type: 'log', nodeId: node.id, data: { 
+      message: `⏩ Auto-speed: ${finalSpeed.toFixed(2)}x (${wordCount} words, ~${naturalDuration.toFixed(1)}s natural → target ${targetDuration}s)`
+    }});
+  }
 
   // Build input based on model type
   let input: any;
@@ -413,12 +430,13 @@ async function executeVoiceoverGenerator(node: WorkflowNode, ctx: ExecutionConte
     };
     ctx.emit({ type: 'log', nodeId: node.id, data: { message: `📝 Using dialogue format: script array with voice "${voice || 'alloy'}"` } });
   } else {
-    // Standard TTS: text + voice
+    // Standard TTS: text + voice + speed
     input = {
       text: voiceText,
       ...(voice ? { voice: voice } : {}),
+      ...(finalSpeed ? { speed: Math.round(finalSpeed * 100) / 100 } : {}),
     };
-    ctx.emit({ type: 'log', nodeId: node.id, data: { message: `📝 Using TTS format: text + voice "${voice || 'default'}"` } });
+    ctx.emit({ type: 'log', nodeId: node.id, data: { message: `📝 Using TTS format: text + voice "${voice || 'default'}"${finalSpeed ? ` + speed ${finalSpeed.toFixed(2)}x` : ''}` } });
   }
 
   ctx.emit({ type: 'api_call', nodeId: node.id, data: { service: 'fal.ai', model: falModel, input } });

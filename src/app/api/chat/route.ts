@@ -99,7 +99,7 @@ You have tools to modify the canvas:
    - element_reference: model='fal-ai/nano-banana-2', elementName=@Name, description=visual desc
    - photo_generator: model='fal-ai/nano-banana-2', prompt=scene desc, width=1920, height=1080
    - video_generator: model='fal-ai/kling-video/o3/pro/image-to-video', prompt=motion desc, duration=5
-   - voiceover_generator: model='fal-ai/elevenlabs/text-to-dialogue/eleven-v3', voice='Rachel', text=dialogue
+   - voiceover_generator: model='fal-ai/elevenlabs/tts/turbo-v2.5', voice='Rachel', text=dialogue (keep ~12 words per 5s shot)
    - project_orchestrator: projectName=workflow name (NOT 'My Video Project'), photoModel, videoModel, voiceModel all filled
    - final_video_compiler: transition='cut', outputResolution='1920x1080', outputFormat='mp4', mode='cloudinary'
    - claude_chat: model='claude-sonnet-4-6', prompt=instruction text

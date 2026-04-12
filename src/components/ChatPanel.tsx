@@ -565,16 +565,16 @@ function MessageBubble({ message, onButtonClick }: { message: ChatMessage; onBut
         )}
       </div>
 
-      <div className={`max-w-[85%] ${isUser ? 'items-end' : 'items-start'} flex flex-col gap-2`}>
+      <div className={`max-w-[85%] min-w-0 ${isUser ? 'items-end' : 'items-start'} flex flex-col gap-2`}>
         <div
-          className={`rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+          className={`rounded-2xl px-4 py-2.5 text-sm leading-relaxed overflow-hidden max-w-full ${
             isUser
               ? 'bg-[var(--primary)] text-white rounded-tr-sm'
               : 'bg-[var(--card)] text-[var(--foreground)] rounded-tl-sm'
           }`}
         >
           {isUser ? (
-            <div className="break-words whitespace-pre-wrap text-sm">
+            <div className="break-words whitespace-pre-wrap text-sm overflow-hidden max-w-full" style={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}>
               {isLongUserMsg && !expanded ? (
                 <>
                   <p>{message.content.slice(0, 150)}...</p>
@@ -587,8 +587,8 @@ function MessageBubble({ message, onButtonClick }: { message: ChatMessage; onBut
                 </>
               ) : (
                 <>
-                  <div className={isLongUserMsg ? 'max-h-[300px] overflow-y-auto' : ''}>
-                    <p>{message.content}</p>
+                  <div className={isLongUserMsg ? 'max-h-[300px] overflow-y-auto overflow-x-hidden' : ''} style={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}>
+                    <p style={{ overflowWrap: 'break-word', wordBreak: 'break-word' }}>{message.content}</p>
                   </div>
                   {isLongUserMsg && (
                     <button
@@ -602,7 +602,7 @@ function MessageBubble({ message, onButtonClick }: { message: ChatMessage; onBut
               )}
             </div>
           ) : (
-            <div className="chat-markdown">
+            <div className="chat-markdown break-words overflow-hidden">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
             </div>
           )}

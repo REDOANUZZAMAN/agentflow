@@ -6,6 +6,7 @@
 import { fal } from '@fal-ai/client';
 import { v2 as cloudinary } from 'cloudinary';
 import { FAL_MODELS, getModelCost, pickImageModel, pickVideoModel } from './fal-models';
+import { calculateCost as calcRealCost } from './fal-pricing';
 
 // Types for execution context
 export interface ExecutionContext {
@@ -136,7 +137,8 @@ async function executeElementReference(node: WorkflowNode, ctx: ExecutionContext
     'image'
   );
 
-  ctx.emit({ type: 'asset_created', nodeId: node.id, data: { type: 'image', url: cldResult.secure_url, name: elementName } });
+  const realCost = calcRealCost(falModel, { numImages: 1 });
+  ctx.emit({ type: 'asset_created', nodeId: node.id, data: { type: 'image', url: cldResult.secure_url, name: elementName, cost: realCost } });
 
   return {
     _nodeType: 'element_reference',
@@ -145,7 +147,8 @@ async function executeElementReference(node: WorkflowNode, ctx: ExecutionContext
     cloudinaryId: cldResult.public_id,
     width: cldResult.width,
     height: cldResult.height,
-    cost: 0.01,
+    model: falModel,
+    cost: realCost,
   };
 }
 
@@ -212,7 +215,7 @@ async function executePhotoGenerator(node: WorkflowNode, ctx: ExecutionContext) 
     shotNumber: shotNum,
     width: cldResult.width,
     height: cldResult.height,
-    cost: 0.01,
+    cost: calcRealCost(falModel, { numImages: 1 }),
   };
 }
 
@@ -312,7 +315,7 @@ async function executeVideoGenerator(node: WorkflowNode, ctx: ExecutionContext) 
     sceneNumber: sceneNum,
     shotNumber: shotNum,
     duration: videoDuration,
-    cost: 0.10,
+    cost: calcRealCost(falModel, { durationSeconds: videoDuration }),
   };
 }
 
@@ -340,7 +343,7 @@ async function executeVoiceoverGenerator(node: WorkflowNode, ctx: ExecutionConte
     const cldResult = await uploadToCloudinary(audioUrl, `agentflow/${ctx.projectId}/audio`, `voiceover_${Date.now()}`, 'video');
     ctx.emit({ type: 'asset_created', nodeId: node.id, data: { type: 'audio', url: cldResult.secure_url } });
 
-    return { _nodeType: 'voiceover_generator', audioUrl: cldResult.secure_url, cloudinaryId: cldResult.public_id, cost: 0.02 };
+    return { _nodeType: 'voiceover_generator', audioUrl: cldResult.secure_url, cloudinaryId: cldResult.public_id, cost: calcRealCost(falModel) };
   } catch (err: any) {
     ctx.emit({ type: 'log', nodeId: node.id, data: { message: `⚠️ Voiceover failed: ${err.message}` } });
     return { _nodeType: 'voiceover_generator', audioUrl: null, cost: 0 };
@@ -364,7 +367,7 @@ async function executeImageGen(node: WorkflowNode, ctx: ExecutionContext) {
   const cldResult = await uploadToCloudinary(imageUrl, `agentflow/${ctx.projectId}/images`, `img_${Date.now()}`, 'image');
   ctx.emit({ type: 'asset_created', nodeId: node.id, data: { type: 'image', url: cldResult.secure_url } });
 
-  return { _nodeType: 'image_gen', imageUrl: cldResult.secure_url, cloudinaryId: cldResult.public_id, cost: 0.01 };
+  return { _nodeType: 'image_gen', imageUrl: cldResult.secure_url, cloudinaryId: cldResult.public_id, model: falModel, cost: calcRealCost(falModel, { numImages: 1 }) };
 }
 
 async function executeClaudeChat(node: WorkflowNode, ctx: ExecutionContext) {

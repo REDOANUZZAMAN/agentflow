@@ -8,6 +8,7 @@ import { v2 as cloudinary } from 'cloudinary';
 import { FAL_MODELS, getModelCost, pickImageModel, pickVideoModel } from './fal-models';
 import { calculateCost as calcRealCost } from './fal-pricing';
 import { applyDefaults } from './node-defaults';
+import { diagnose, applyTransformation, sleep, RECOVERY_LIMITS, type RecoveryAttempt, type RecoveryContext } from './recovery-agent';
 
 // Types for execution context
 export interface ExecutionContext {
@@ -845,6 +846,7 @@ export async function executeWorkflow(
   let totalCost = 0;
   const allAssets: any[] = [];
   const errors: string[] = [];
+  let executionRecoveryCount = 0;
 
   emit({ type: 'log', data: { message: `▶️ Starting workflow execution: ${sorted.length} nodes` } });
 
@@ -860,34 +862,248 @@ export async function executeWorkflow(
     const startTime = Date.now();
     emit({ type: 'node_start', nodeId: node.id, nodeName: `${node.data.emoji} ${node.data.label}`, data: { type: nodeType } });
 
-    try {
-      const output = await executor(node, ctx);
-      const duration = Date.now() - startTime;
-      ctx.nodeOutputs.set(node.id, output);
-      totalCost += output.cost || 0;
+    // ── Execute with auto-recovery ──────────────────────────────
+    const recoveryAttempts: RecoveryAttempt[] = [];
+    let currentNode = node;
+    let succeeded = false;
+    let totalRecoveryCost = 0;
 
-      if (output.imageUrl || output.photoUrl || output.videoUrl || output.audioUrl || output.finalVideoUrl) {
-        allAssets.push({ nodeId: node.id, ...output });
+    for (let attempt = 0; attempt <= RECOVERY_LIMITS.MAX_ATTEMPTS_PER_NODE; attempt++) {
+      // Check execution-wide recovery limit
+      if (executionRecoveryCount >= RECOVERY_LIMITS.MAX_ATTEMPTS_PER_EXECUTION) {
+        emit({ type: 'log', nodeId: node.id, data: { message: `🛑 Execution recovery budget exhausted (${executionRecoveryCount} total retries)` } });
+        break;
       }
 
-      emit({
-        type: 'node_end',
-        nodeId: node.id,
-        nodeName: `${node.data.emoji} ${node.data.label}`,
-        data: { output: { ...output, _nodeType: undefined } },
-        duration,
-      });
-    } catch (err: any) {
+      try {
+        const output = await EXECUTORS[currentNode.data.type]!(currentNode, ctx);
+        const duration = Date.now() - startTime;
+        ctx.nodeOutputs.set(node.id, output);
+        totalCost += (output.cost || 0) + totalRecoveryCost;
+
+        if (output.imageUrl || output.photoUrl || output.videoUrl || output.audioUrl || output.finalVideoUrl) {
+          allAssets.push({ nodeId: node.id, ...output });
+        }
+
+        // Log recovery success if we recovered
+        if (attempt > 0) {
+          emit({ type: 'log', nodeId: node.id, data: { 
+            message: `⚡ Auto-recovered after ${attempt} attempt(s)! ${recoveryAttempts[recoveryAttempts.length - 1]?.reasoning || ''}`,
+            recovery: true,
+            attempts: recoveryAttempts,
+          }});
+        }
+
+        emit({
+          type: 'node_end',
+          nodeId: node.id,
+          nodeName: `${node.data.emoji} ${node.data.label}`,
+          data: { 
+            output: { ...output, _nodeType: undefined },
+            recovered: attempt > 0,
+            recoveryAttempts: attempt > 0 ? recoveryAttempts : undefined,
+          },
+          duration,
+        });
+
+        succeeded = true;
+        break; // Success — exit retry loop
+
+      } catch (err: any) {
+        const errMsg = err.message || String(err);
+
+        // First failure or subsequent — run recovery agent
+        if (attempt < RECOVERY_LIMITS.MAX_ATTEMPTS_PER_NODE) {
+          // Build recovery context
+          const upstreamOutputs: Record<string, any> = {};
+          for (const edge of ctx.edges) {
+            if (edge.target === node.id) {
+              const up = ctx.nodeOutputs.get(edge.source);
+              if (up) upstreamOutputs[edge.source] = up;
+            }
+          }
+
+          const recoveryCtx: RecoveryContext = {
+            nodeId: node.id,
+            nodeType: currentNode.data.type,
+            nodeLabel: currentNode.data.label,
+            nodeConfig: currentNode.data.config,
+            errorMessage: errMsg,
+            httpStatus: err.status || err.statusCode,
+            httpResponse: err.body || err.response,
+            upstreamOutputs,
+            previousAttempts: recoveryAttempts,
+            executionId: ctx.executionId,
+          };
+
+          emit({ type: 'log', nodeId: node.id, data: { 
+            message: `🔧 Recovery Agent activated (attempt ${attempt + 1}/${RECOVERY_LIMITS.MAX_ATTEMPTS_PER_NODE}): "${errMsg.substring(0, 100)}"`,
+            recovery: true,
+          }});
+
+          // Get diagnosis
+          const decision = await diagnose(recoveryCtx);
+
+          emit({ type: 'log', nodeId: node.id, data: { 
+            message: `🔧 Recovery: ${decision.action} — ${decision.reasoning}`,
+            recovery: true,
+          }});
+
+          const attemptRecord: RecoveryAttempt = {
+            attempt: attempt + 1,
+            action: decision.action,
+            changes: decision.configChanges || (decision.newModel ? { model: decision.newModel } : undefined),
+            reasoning: decision.reasoning,
+            outcome: 'failed', // will be updated if retry succeeds
+            error: errMsg,
+            timestamp: new Date().toISOString(),
+          };
+          recoveryAttempts.push(attemptRecord);
+          executionRecoveryCount++;
+
+          // Execute the recovery decision
+          switch (decision.action) {
+            case 'retry':
+              // Simple retry with wait
+              if (decision.waitSeconds && decision.waitSeconds > 0) {
+                emit({ type: 'log', nodeId: node.id, data: { 
+                  message: `⏳ Waiting ${decision.waitSeconds}s before retry...`,
+                  recovery: true,
+                }});
+                await sleep(decision.waitSeconds * 1000);
+              }
+              // Loop continues — will retry same node
+              continue;
+
+            case 'retry_with_config':
+              // Modify config and retry
+              if (decision.configChanges) {
+                currentNode = {
+                  ...currentNode,
+                  data: {
+                    ...currentNode.data,
+                    config: { ...currentNode.data.config, ...decision.configChanges },
+                  },
+                };
+                emit({ type: 'log', nodeId: node.id, data: { 
+                  message: `📝 Config changed: ${JSON.stringify(decision.configChanges)}`,
+                  recovery: true,
+                }});
+              }
+              continue;
+
+            case 'switch_model':
+              if (decision.newModel) {
+                currentNode = {
+                  ...currentNode,
+                  data: {
+                    ...currentNode.data,
+                    config: { ...currentNode.data.config, model: decision.newModel },
+                  },
+                };
+                emit({ type: 'log', nodeId: node.id, data: { 
+                  message: `🔄 Switched model to ${decision.newModel}`,
+                  recovery: true,
+                }});
+              }
+              continue;
+
+            case 'fix_input':
+              if (decision.transformation) {
+                const fixedConfig = applyTransformation(
+                  currentNode.data.config,
+                  decision.transformation,
+                  decision.transformParams
+                );
+                currentNode = {
+                  ...currentNode,
+                  data: { ...currentNode.data, config: fixedConfig },
+                };
+                emit({ type: 'log', nodeId: node.id, data: { 
+                  message: `🔧 Applied transformation: ${decision.transformation}`,
+                  recovery: true,
+                }});
+              }
+              continue;
+
+            case 'skip':
+              emit({ type: 'log', nodeId: node.id, data: { 
+                message: `⏭️ Skipping node: ${decision.reasoning}`,
+                recovery: true,
+              }});
+              // Mark as "skipped" output so downstream knows
+              ctx.nodeOutputs.set(node.id, { 
+                _nodeType: nodeType, 
+                _skipped: true, 
+                _skipReason: decision.reasoning,
+                cost: 0,
+              });
+              succeeded = true; // Don't count as error
+              break;
+
+            case 'escalate':
+              // Give up — log the escalation with user-friendly message
+              const duration = Date.now() - startTime;
+              const userMsg = decision.userMessage || `"${node.data.label}" failed after ${attempt + 1} attempt(s): ${errMsg}`;
+              errors.push(userMsg);
+              emit({
+                type: 'node_error',
+                nodeId: node.id,
+                nodeName: `${node.data.emoji} ${node.data.label}`,
+                data: { 
+                  error: userMsg,
+                  recovery: true,
+                  escalated: true,
+                  attempts: recoveryAttempts,
+                  suggestedActions: decision.suggestedActions,
+                },
+                duration,
+              });
+              succeeded = true; // Handled (escalated), don't double-report
+              break;
+          }
+
+          if (decision.action === 'skip' || decision.action === 'escalate') break;
+
+        } else {
+          // Max attempts reached without recovery decision — final error
+          const duration = Date.now() - startTime;
+          errors.push(`${node.data.label}: ${errMsg} (after ${attempt} recovery attempts)`);
+          emit({
+            type: 'node_error',
+            nodeId: node.id,
+            nodeName: `${node.data.emoji} ${node.data.label}`,
+            data: { 
+              error: errMsg,
+              recovery: true,
+              exhausted: true,
+              attempts: recoveryAttempts,
+            },
+            duration,
+          });
+          break;
+        }
+      }
+    }
+
+    // If all retries failed and we never succeeded
+    if (!succeeded && recoveryAttempts.length > 0) {
       const duration = Date.now() - startTime;
-      errors.push(`${node.data.label}: ${err.message}`);
-      emit({
-        type: 'node_error',
-        nodeId: node.id,
-        nodeName: `${node.data.emoji} ${node.data.label}`,
-        data: { error: err.message },
-        duration,
-      });
-      // Continue execution — don't stop on single node failure
+      if (!errors.some(e => e.includes(node.data.label))) {
+        errors.push(`${node.data.label}: failed after ${recoveryAttempts.length} recovery attempt(s)`);
+        emit({
+          type: 'node_error',
+          nodeId: node.id,
+          nodeName: `${node.data.emoji} ${node.data.label}`,
+          data: { 
+            error: `Failed after ${recoveryAttempts.length} recovery attempts`,
+            recovery: true,
+            exhausted: true,
+            attempts: recoveryAttempts,
+          },
+          duration,
+        });
+      }
     }
   }
 

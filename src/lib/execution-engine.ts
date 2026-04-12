@@ -556,8 +556,9 @@ async function executeProjectOrchestrator(node: WorkflowNode, ctx: ExecutionCont
 async function executeFinalVideoCompiler(node: WorkflowNode, ctx: ExecutionContext) {
   ctx.emit({ type: 'log', nodeId: node.id, data: { message: `🎞️ Compiling final video...` } });
 
-  // Get all video URLs from upstream — sort by scene+shot order
   const allOutputs = Array.from(ctx.nodeOutputs.values());
+  
+  // Get all video clips — sort by scene+shot order
   const videos = allOutputs
     .filter(o => o._nodeType === 'video_generator' && o.videoUrl)
     .sort((a, b) => {
@@ -566,80 +567,169 @@ async function executeFinalVideoCompiler(node: WorkflowNode, ctx: ExecutionConte
       return sa - sb;
     });
 
+  // Get all voiceover audio tracks
+  const voiceovers = allOutputs
+    .filter(o => o._nodeType === 'voiceover_generator' && o.audioUrl && o.cloudinaryId)
+    .sort((a, b) => (a.sceneNumber || 0) - (b.sceneNumber || 0));
+
   if (videos.length === 0) {
     ctx.emit({ type: 'log', nodeId: node.id, data: { message: `⚠️ No videos found to compile` } });
     return { _nodeType: 'final_video_compiler', finalVideoUrl: null, cost: 0 };
   }
 
-  ctx.emit({ type: 'log', nodeId: node.id, data: { message: `📹 Found ${videos.length} video clips to merge` } });
+  ctx.emit({ type: 'log', nodeId: node.id, data: { 
+    message: `📹 Found ${videos.length} video clips + ${voiceovers.length} voiceover tracks` 
+  }});
 
-  // Single video — just use it directly
-  if (videos.length === 1) {
-    ctx.emit({ type: 'asset_created', nodeId: node.id, data: { type: 'final_video', url: videos[0].videoUrl } });
-    return { _nodeType: 'final_video_compiler', finalVideoUrl: videos[0].videoUrl, videoCount: 1, cost: 0 };
-  }
+  const cld = initCloudinary();
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+  const folder = `workflows/${ctx.projectId}/run-${ctx.executionId}`;
 
-  // Multiple videos — try Cloudinary splice then upload as new asset
-  try {
-    const cld = initCloudinary();
-    const videoIds = videos.map(v => v.cloudinaryId).filter(Boolean);
-
-    if (videoIds.length >= 2) {
-      ctx.emit({ type: 'log', nodeId: node.id, data: { message: `🔗 Splicing ${videoIds.length} clips via Cloudinary...` } });
-
-      // Build Cloudinary splice URL
+  // ── Step 1: Splice video clips together ────────────────────────
+  let splicedVideoId: string | null = null;
+  let splicedVideoUrl: string;
+  
+  const videoIds = videos.map(v => v.cloudinaryId).filter(Boolean);
+  
+  if (videoIds.length >= 2) {
+    try {
+      ctx.emit({ type: 'log', nodeId: node.id, data: { message: `🔗 Splicing ${videoIds.length} clips...` } });
+      
       const baseId = videoIds[0];
       const spliceOverlays = videoIds.slice(1).map(id => `fl_splice,l_video:${id.replace(/\//g, ':')}`).join('/');
-      const spliceUrl = `https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME}/video/upload/${spliceOverlays}/${baseId}.mp4`;
-
-      // Upload the spliced URL as a NEW video asset (forces Cloudinary to render it)
-      const folder = `workflows/${ctx.projectId}/run-${ctx.executionId}`;
-      const finalResult = await cld.uploader.upload(spliceUrl, {
+      const spliceUrl = `https://res.cloudinary.com/${cloudName}/video/upload/${spliceOverlays}/${baseId}.mp4`;
+      
+      const spliceResult = await cld.uploader.upload(spliceUrl, {
         folder,
-        public_id: 'final',
+        public_id: 'spliced_video',
         resource_type: 'video',
         overwrite: true,
       });
-
-      const finalUrl = finalResult.secure_url;
-      const totalDuration = videos.reduce((sum: number, v: any) => sum + (v.duration || 0), 0);
-
-      ctx.emit({ type: 'log', nodeId: node.id, data: { message: `✅ Final video merged: ${finalUrl}` } });
-      ctx.emit({ type: 'asset_created', nodeId: node.id, data: {
-        type: 'final_video',
-        url: finalUrl,
-        cloudinaryId: finalResult.public_id,
-        duration: totalDuration,
-        clipCount: videos.length,
-        tags: ['final'],
-      }});
-
-      return {
-        _nodeType: 'final_video_compiler',
-        finalVideoUrl: finalUrl,
-        cloudinaryId: finalResult.public_id,
-        videoCount: videos.length,
-        duration: totalDuration,
-        cost: 0,
-      };
+      
+      splicedVideoId = spliceResult.public_id;
+      splicedVideoUrl = spliceResult.secure_url;
+      ctx.emit({ type: 'log', nodeId: node.id, data: { message: `✅ Video clips spliced: ${splicedVideoUrl}` } });
+    } catch (err: any) {
+      ctx.emit({ type: 'log', nodeId: node.id, data: { message: `⚠️ Splice failed: ${err.message}. Using first clip.` } });
+      splicedVideoUrl = videos[0].videoUrl;
+      splicedVideoId = videos[0].cloudinaryId;
     }
-  } catch (err: any) {
-    ctx.emit({ type: 'log', nodeId: node.id, data: { message: `⚠️ Cloudinary splice failed: ${err.message}` } });
-
-    // Fallback: return the individual videos as a playlist
-    ctx.emit({ type: 'log', nodeId: node.id, data: { message: `📋 Falling back to individual clips list (${videos.length} clips)` } });
-    const clipUrls = videos.map((v: any) => v.videoUrl);
-    return {
-      _nodeType: 'final_video_compiler',
-      finalVideoUrl: clipUrls[0],
-      allClipUrls: clipUrls,
-      videoCount: videos.length,
-      spliceError: err.message,
-      cost: 0,
-    };
+  } else {
+    splicedVideoUrl = videos[0].videoUrl;
+    splicedVideoId = videos[0].cloudinaryId;
   }
 
-  return { _nodeType: 'final_video_compiler', finalVideoUrl: videos[0].videoUrl, videoCount: videos.length, cost: 0 };
+  // ── Step 2: Concatenate voiceover audio tracks ─────────────────
+  let audioId: string | null = null;
+  
+  if (voiceovers.length > 0) {
+    const voiceIds = voiceovers.map(v => v.cloudinaryId).filter(Boolean);
+    
+    if (voiceIds.length >= 2) {
+      // Splice multiple audio tracks together
+      try {
+        ctx.emit({ type: 'log', nodeId: node.id, data: { message: `🔗 Concatenating ${voiceIds.length} voiceover tracks...` } });
+        const baseAudio = voiceIds[0];
+        const audioSplice = voiceIds.slice(1).map(id => `fl_splice,l_video:${id.replace(/\//g, ':')}`).join('/');
+        const audioSpliceUrl = `https://res.cloudinary.com/${cloudName}/video/upload/${audioSplice}/${baseAudio}.mp3`;
+        
+        const audioResult = await cld.uploader.upload(audioSpliceUrl, {
+          folder,
+          public_id: 'spliced_audio',
+          resource_type: 'video',
+          overwrite: true,
+        });
+        audioId = audioResult.public_id;
+        ctx.emit({ type: 'log', nodeId: node.id, data: { message: `✅ Audio tracks concatenated` } });
+      } catch (err: any) {
+        ctx.emit({ type: 'log', nodeId: node.id, data: { message: `⚠️ Audio concat failed: ${err.message}. Using first track.` } });
+        audioId = voiceIds[0];
+      }
+    } else if (voiceIds.length === 1) {
+      audioId = voiceIds[0];
+    }
+  }
+
+  // ── Step 3: Merge audio onto video ─────────────────────────────
+  let finalUrl = splicedVideoUrl;
+  let finalPublicId = splicedVideoId;
+
+  if (audioId && splicedVideoId) {
+    try {
+      ctx.emit({ type: 'log', nodeId: node.id, data: { message: `🔊 Overlaying voiceover audio onto video...` } });
+      
+      // Cloudinary: overlay audio on video using l_video transformation
+      const audioOverlayId = audioId.replace(/\//g, ':');
+      const videoWithAudioUrl = `https://res.cloudinary.com/${cloudName}/video/upload/l_video:${audioOverlayId},fl_layer_apply/${splicedVideoId}.mp4`;
+      
+      ctx.emit({ type: 'log', nodeId: node.id, data: { message: `📎 Audio overlay URL: ${videoWithAudioUrl.substring(0, 120)}...` } });
+      
+      const finalResult = await cld.uploader.upload(videoWithAudioUrl, {
+        folder,
+        public_id: 'final_with_audio',
+        resource_type: 'video',
+        overwrite: true,
+      });
+      
+      finalUrl = finalResult.secure_url;
+      finalPublicId = finalResult.public_id;
+      ctx.emit({ type: 'log', nodeId: node.id, data: { message: `✅ Final video WITH audio: ${finalUrl}` } });
+    } catch (err: any) {
+      ctx.emit({ type: 'log', nodeId: node.id, data: { 
+        message: `⚠️ Audio overlay failed: ${err.message}. Final video will be silent.` 
+      }});
+      // Fall back to video without audio — still save as final
+      try {
+        const fallbackResult = await cld.uploader.upload(splicedVideoUrl, {
+          folder,
+          public_id: 'final',
+          resource_type: 'video',
+          overwrite: true,
+        });
+        finalUrl = fallbackResult.secure_url;
+        finalPublicId = fallbackResult.public_id;
+      } catch { /* keep splicedVideoUrl */ }
+    }
+  } else if (!audioId) {
+    ctx.emit({ type: 'log', nodeId: node.id, data: { message: `ℹ️ No voiceover audio found — final video will be silent` } });
+    // Still upload as final
+    if (splicedVideoId) {
+      try {
+        const noAudioResult = await cld.uploader.upload(splicedVideoUrl, {
+          folder,
+          public_id: 'final',
+          resource_type: 'video',
+          overwrite: true,
+        });
+        finalUrl = noAudioResult.secure_url;
+        finalPublicId = noAudioResult.public_id;
+      } catch { /* keep existing URL */ }
+    }
+  }
+
+  const totalDuration = videos.reduce((sum: number, v: any) => sum + (v.duration || 0), 0);
+
+  ctx.emit({ type: 'asset_created', nodeId: node.id, data: {
+    type: 'final_video',
+    url: finalUrl,
+    cloudinaryId: finalPublicId,
+    duration: totalDuration,
+    clipCount: videos.length,
+    hasAudio: !!audioId,
+    voiceoverCount: voiceovers.length,
+    tags: ['final'],
+  }});
+
+  return {
+    _nodeType: 'final_video_compiler',
+    finalVideoUrl: finalUrl,
+    cloudinaryId: finalPublicId,
+    videoCount: videos.length,
+    voiceoverCount: voiceovers.length,
+    hasAudio: !!audioId,
+    duration: totalDuration,
+    cost: 0,
+  };
 }
 
 // Passthrough nodes

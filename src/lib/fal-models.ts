@@ -27,7 +27,7 @@ export const IMAGE_MODEL_CATALOG = [
   {
     id: FAL_MODELS.IMAGE_NANO_BANANA,
     name: 'Nano Banana 2',
-    label: '⚡ Nano Banana 2 (default, fast)',
+    label: '[zap] Nano Banana 2 (default, fast)',
     description: 'Fast, balanced quality. Great default for most generations.',
     bestFor: ['general images', 'characters', 'scenes', 'fast iteration'],
     cost: '$0.04',
@@ -36,7 +36,7 @@ export const IMAGE_MODEL_CATALOG = [
   {
     id: FAL_MODELS.IMAGE_NANO_BANANA_EDIT,
     name: 'Nano Banana 2 + Refs',
-    label: '🎨 Nano Banana 2 Edit (with refs)',
+    label: '[art] Nano Banana 2 Edit (with refs)',
     description: 'Same model with reference images for character consistency.',
     bestFor: ['element-consistent shots', 'character reuse'],
     cost: '$0.04',
@@ -46,7 +46,7 @@ export const IMAGE_MODEL_CATALOG = [
   {
     id: FAL_MODELS.IMAGE_SEEDREAM,
     name: 'Seedream 4.5',
-    label: '✨ Seedream 4.5 (4K, text-in-image)',
+    label: '[sparkle] Seedream 4.5 (4K, text-in-image)',
     description: 'High-res 4K. Best-in-class text rendering inside images.',
     bestFor: ['posters', 'thumbnails', 'signs/text scenes', 'high detail'],
     cost: '$0.06',
@@ -68,7 +68,7 @@ export const VIDEO_MODEL_CATALOG = [
   {
     id: FAL_MODELS.VIDEO_KLING_O3_I2V,
     name: 'Kling O3 Pro (Image→Video)',
-    label: '🎬 Kling O3 Pro Image-to-Video (default)',
+    label: '[video] Kling O3 Pro Image-to-Video (default)',
     description: 'Premium quality. 3–15s. Native audio support.',
     cost: '$0.95',
     inputType: 'image',
@@ -95,14 +95,14 @@ export const VOICE_MODEL_CATALOG = [
   {
     id: FAL_MODELS.VOICE_TTS,
     name: 'ElevenLabs TTS',
-    label: '🗣️ ElevenLabs TTS (default)',
+    label: '[voice] ElevenLabs TTS (default)',
     description: 'Simple text-to-speech. Best for narration and voiceovers.',
     cost: '$0.03',
   },
   {
     id: FAL_MODELS.VOICE_DIALOGUE,
     name: 'ElevenLabs v3 Dialogue',
-    label: '🎭 ElevenLabs v3 Dialogue (multi-speaker)',
+    label: '[masks] ElevenLabs v3 Dialogue (multi-speaker)',
     description: 'Multi-speaker dialogue with script format.',
     cost: '$0.05',
   },
@@ -112,7 +112,7 @@ export const MUSIC_MODEL_CATALOG = [
   {
     id: FAL_MODELS.MUSIC,
     name: 'ElevenLabs Music',
-    label: '🎵 ElevenLabs Music',
+    label: '[music] ElevenLabs Music',
     description: 'AI-generated background music and soundtracks.',
     cost: '$0.10',
   },

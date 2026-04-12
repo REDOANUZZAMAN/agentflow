@@ -115,7 +115,7 @@ async function executeElementReference(node: WorkflowNode, ctx: ExecutionContext
   const prompt = description || `High quality reference image of ${elementName}`;
   const falModel = model || FAL_MODELS.IMAGE_NANO_BANANA;
 
-  ctx.emit({ type: 'log', nodeId: node.id, data: { message: `🎨 Generating reference for "${elementName}" via ${falModel}...` } });
+  ctx.emit({ type: 'log', nodeId: node.id, data: { message: `[art] Generating reference for "${elementName}" via ${falModel}...` } });
   ctx.emit({ type: 'api_call', nodeId: node.id, data: { service: 'fal.ai', model: falModel, prompt } });
 
   const result = await fal.subscribe(falModel, {
@@ -130,7 +130,7 @@ async function executeElementReference(node: WorkflowNode, ctx: ExecutionContext
   const imageUrl = (result as any).data?.images?.[0]?.url || (result as any).images?.[0]?.url;
   if (!imageUrl) throw new Error(`No image returned from fal.ai for element "${elementName}"`);
 
-  ctx.emit({ type: 'log', nodeId: node.id, data: { message: `📤 Uploading to Cloudinary...` } });
+  ctx.emit({ type: 'log', nodeId: node.id, data: { message: `[upload] Uploading to Cloudinary...` } });
 
   const cldResult = await uploadToCloudinary(
     imageUrl,
@@ -184,7 +184,7 @@ async function executePhotoGenerator(node: WorkflowNode, ctx: ExecutionContext) 
   const elementDescriptions = elementRefs.map((r: any) => r.elementName || '').filter(Boolean);
   
   ctx.emit({ type: 'log', nodeId: node.id, data: { 
-    message: `📸 Found ${elementRefs.length} element refs: ${elementDescriptions.join(', ') || 'none'} | URLs: ${referenceUrls.length}` 
+    message: `[photo] Found ${elementRefs.length} element refs: ${elementDescriptions.join(', ') || 'none'} | URLs: ${referenceUrls.length}` 
   }});
   
   // CRITICAL: If element refs are connected, ALWAYS use an edit model
@@ -195,7 +195,7 @@ async function executePhotoGenerator(node: WorkflowNode, ctx: ExecutionContext) 
     falModel = pickImageModel(true, elementRefs.length, false);
     if (model && model !== falModel) {
       ctx.emit({ type: 'log', nodeId: node.id, data: { 
-        message: `🔄 Auto-upgrading model: ${model} → ${falModel} (element refs require edit model)` 
+        message: `[refresh] Auto-upgrading model: ${model} → ${falModel} (element refs require edit model)` 
       }});
     }
   } else {
@@ -226,7 +226,7 @@ async function executePhotoGenerator(node: WorkflowNode, ctx: ExecutionContext) 
     throw new Error(`Photo prompt is empty or too short: "${finalPrompt}". Provide a descriptive prompt.`);
   }
   
-  ctx.emit({ type: 'log', nodeId: node.id, data: { message: `📸 Generating photo for Scene ${sceneNum}, Shot ${shotNum} via ${falModel}...` } });
+  ctx.emit({ type: 'log', nodeId: node.id, data: { message: `[photo] Generating photo for Scene ${sceneNum}, Shot ${shotNum} via ${falModel}...` } });
   ctx.emit({ type: 'api_call', nodeId: node.id, data: { service: 'fal.ai', model: falModel, prompt: finalPrompt, elementRefs: referenceUrls.length } });
 
   const input: any = {
@@ -242,12 +242,12 @@ async function executePhotoGenerator(node: WorkflowNode, ctx: ExecutionContext) 
     // fal.ai edit models accept image_urls (array of reference images)
     input.image_urls = referenceUrls;
     ctx.emit({ type: 'log', nodeId: node.id, data: { 
-      message: `🔗 Passing ${referenceUrls.length} reference image(s) to ${falModel}: ${referenceUrls.map((u: string) => u.substring(0, 60) + '...').join(', ')}` 
+      message: `[link] Passing ${referenceUrls.length} reference image(s) to ${falModel}: ${referenceUrls.map((u: string) => u.substring(0, 60) + '...').join(', ')}` 
     }});
   } else if (referenceUrls.length > 0) {
     // Non-edit model but refs exist — try passing as image_url anyway
     ctx.emit({ type: 'log', nodeId: node.id, data: { 
-      message: `⚠️ Model ${falModel} is not an edit model but ${referenceUrls.length} refs are available. Refs will be in prompt text only.` 
+      message: `[warn] Model ${falModel} is not an edit model but ${referenceUrls.length} refs are available. Refs will be in prompt text only.` 
     }});
   }
 
@@ -257,7 +257,7 @@ async function executePhotoGenerator(node: WorkflowNode, ctx: ExecutionContext) 
     result = await fal.subscribe(falModel, { input });
   } catch (err: any) {
     ctx.emit({ type: 'log', nodeId: node.id, data: { 
-      message: `❌ fal.ai photo request FAILED. Model: ${falModel}, Input: ${JSON.stringify(input, null, 2)}`,
+      message: `[x] fal.ai photo request FAILED. Model: ${falModel}, Input: ${JSON.stringify(input, null, 2)}`,
       error: err.message,
       body: err.body || err.response || null,
     }});
@@ -267,7 +267,7 @@ async function executePhotoGenerator(node: WorkflowNode, ctx: ExecutionContext) 
   const imageUrl = (result as any).data?.images?.[0]?.url || (result as any).images?.[0]?.url;
   if (!imageUrl) throw new Error('No photo URL returned from fal.ai');
 
-  ctx.emit({ type: 'log', nodeId: node.id, data: { message: `📤 Uploading photo to Cloudinary (scene-${sceneNum}/shot-${shotNum})...` } });
+  ctx.emit({ type: 'log', nodeId: node.id, data: { message: `[upload] Uploading photo to Cloudinary (scene-${sceneNum}/shot-${shotNum})...` } });
 
   // Fix 1: Unique path per scene/shot/execution
   const cldResult = await uploadToCloudinary(
@@ -329,10 +329,10 @@ async function executeVideoGenerator(node: WorkflowNode, ctx: ExecutionContext) 
 
   if (!sourceImageUrl) {
     // Fix 3: Fallback — find by matching scene+shot in ALL completed outputs
-    ctx.emit({ type: 'log', nodeId: node.id, data: { message: `⚠️ No upstream photo via edges — searching by scene ${sceneNum}, shot ${shotNum}...` } });
+    ctx.emit({ type: 'log', nodeId: node.id, data: { message: `[warn] No upstream photo via edges — searching by scene ${sceneNum}, shot ${shotNum}...` } });
     sourceImageUrl = findPhotoBySceneShot(ctx, sceneNum, shotNum);
     if (sourceImageUrl) {
-      ctx.emit({ type: 'log', nodeId: node.id, data: { message: `✅ Found matching photo by scene/shot lookup` } });
+      ctx.emit({ type: 'log', nodeId: node.id, data: { message: `[ok] Found matching photo by scene/shot lookup` } });
     }
   }
 
@@ -342,7 +342,7 @@ async function executeVideoGenerator(node: WorkflowNode, ctx: ExecutionContext) 
 
   const falModel = model || pickVideoModel(!!sourceImageUrl, upstreamRefs.length > 0);
 
-  ctx.emit({ type: 'log', nodeId: node.id, data: { message: `🎬 Generating ${videoDuration}s video for Scene ${sceneNum}, Shot ${shotNum} via ${falModel}...` } });
+  ctx.emit({ type: 'log', nodeId: node.id, data: { message: `[video] Generating ${videoDuration}s video for Scene ${sceneNum}, Shot ${shotNum} via ${falModel}...` } });
   ctx.emit({ type: 'api_call', nodeId: node.id, data: { service: 'fal.ai', model: falModel, duration: videoDuration } });
 
   const input: any = {
@@ -359,7 +359,7 @@ async function executeVideoGenerator(node: WorkflowNode, ctx: ExecutionContext) 
     result = await fal.subscribe(falModel, { input });
   } catch (err: any) {
     ctx.emit({ type: 'log', nodeId: node.id, data: {
-      message: `❌ fal.ai video request FAILED. Model: ${falModel}, Input: ${JSON.stringify(input, null, 2)}`,
+      message: `[x] fal.ai video request FAILED. Model: ${falModel}, Input: ${JSON.stringify(input, null, 2)}`,
       error: err.message,
     }});
     throw new Error(`fal.ai video generation failed (${falModel}): ${err.message}`);
@@ -368,7 +368,7 @@ async function executeVideoGenerator(node: WorkflowNode, ctx: ExecutionContext) 
   const videoUrl = (result as any).data?.video?.url || (result as any).video?.url;
   if (!videoUrl) throw new Error('No video URL returned from fal.ai');
 
-  ctx.emit({ type: 'log', nodeId: node.id, data: { message: `📤 Uploading video to Cloudinary (scene-${sceneNum}/shot-${shotNum})...` } });
+  ctx.emit({ type: 'log', nodeId: node.id, data: { message: `[upload] Uploading video to Cloudinary (scene-${sceneNum}/shot-${shotNum})...` } });
 
   // Fix 1: Unique path per execution
   const cldResult = await uploadToCloudinary(
@@ -413,7 +413,7 @@ async function executeVoiceoverGenerator(node: WorkflowNode, ctx: ExecutionConte
   const finalSpeed = configSpeed || (autoSpeed > 1.0 ? autoSpeed : undefined);
 
   ctx.emit({ type: 'log', nodeId: node.id, data: { 
-    message: `🗣️ Generating voiceover via ${falModel}... Text: "${voiceText.substring(0, 80)}${voiceText.length > 80 ? '...' : ''}"` 
+    message: `[voice] Generating voiceover via ${falModel}... Text: "${voiceText.substring(0, 80)}${voiceText.length > 80 ? '...' : ''}"` 
   }});
   if (finalSpeed && finalSpeed > 1.0) {
     ctx.emit({ type: 'log', nodeId: node.id, data: { 
@@ -446,7 +446,7 @@ async function executeVoiceoverGenerator(node: WorkflowNode, ctx: ExecutionConte
     result = await fal.subscribe(falModel, { input });
   } catch (err: any) {
     ctx.emit({ type: 'log', nodeId: node.id, data: { 
-      message: `❌ fal.ai voiceover FAILED. Model: ${falModel}, Input: ${JSON.stringify(input)}`,
+      message: `[x] fal.ai voiceover FAILED. Model: ${falModel}, Input: ${JSON.stringify(input)}`,
       error: err.message,
       body: err.body || null,
     }});
@@ -456,7 +456,7 @@ async function executeVoiceoverGenerator(node: WorkflowNode, ctx: ExecutionConte
   // Log raw response structure for debugging
   const resultData = (result as any).data || result;
   ctx.emit({ type: 'log', nodeId: node.id, data: { 
-    message: `📦 Raw response keys: ${JSON.stringify(Object.keys(resultData))}`,
+    message: `[box] Raw response keys: ${JSON.stringify(Object.keys(resultData))}`,
     rawKeys: Object.keys(resultData),
   }});
 
@@ -472,13 +472,13 @@ async function executeVoiceoverGenerator(node: WorkflowNode, ctx: ExecutionConte
 
   if (!audioUrl || typeof audioUrl !== 'string') {
     ctx.emit({ type: 'log', nodeId: node.id, data: { 
-      message: `❌ No audio URL found in response! Full response: ${JSON.stringify(resultData).substring(0, 500)}`,
+      message: `[x] No audio URL found in response! Full response: ${JSON.stringify(resultData).substring(0, 500)}`,
     }});
     throw new Error(`Voiceover: no audio URL in fal.ai response. Response keys: ${Object.keys(resultData).join(', ')}`);
   }
 
-  ctx.emit({ type: 'log', nodeId: node.id, data: { message: `✅ Got audio URL: ${audioUrl.substring(0, 80)}...` } });
-  ctx.emit({ type: 'log', nodeId: node.id, data: { message: `📤 Uploading voiceover to Cloudinary...` } });
+  ctx.emit({ type: 'log', nodeId: node.id, data: { message: `[ok] Got audio URL: ${audioUrl.substring(0, 80)}...` } });
+  ctx.emit({ type: 'log', nodeId: node.id, data: { message: `[upload] Uploading voiceover to Cloudinary...` } });
 
   const cldResult = await uploadToCloudinary(
     audioUrl, 
@@ -503,7 +503,7 @@ async function executeImageGen(node: WorkflowNode, ctx: ExecutionContext) {
   const { prompt, model } = node.data.config;
   const falModel = model || FAL_MODELS.IMAGE_NANO_BANANA;
 
-  ctx.emit({ type: 'log', nodeId: node.id, data: { message: `🖼️ Generating image via ${falModel}...` } });
+  ctx.emit({ type: 'log', nodeId: node.id, data: { message: `[image] Generating image via ${falModel}...` } });
 
   const result = await fal.subscribe(falModel, {
     input: { prompt: prompt || 'A beautiful image', num_images: 1, image_size: 'landscape_16_9' },
@@ -521,7 +521,7 @@ async function executeImageGen(node: WorkflowNode, ctx: ExecutionContext) {
 async function executeClaudeChat(node: WorkflowNode, ctx: ExecutionContext) {
   const { prompt, model } = node.data.config;
 
-  ctx.emit({ type: 'log', nodeId: node.id, data: { message: `🧠 Calling Claude AI...` } });
+  ctx.emit({ type: 'log', nodeId: node.id, data: { message: `[brain] Calling Claude AI...` } });
 
   // Use Supabase proxy or direct API
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -546,7 +546,7 @@ async function executeClaudeChat(node: WorkflowNode, ctx: ExecutionContext) {
 }
 
 async function executeProjectOrchestrator(node: WorkflowNode, ctx: ExecutionContext) {
-  ctx.emit({ type: 'log', nodeId: node.id, data: { message: `🎯 Orchestrating project assets...` } });
+  ctx.emit({ type: 'log', nodeId: node.id, data: { message: `[target] Orchestrating project assets...` } });
   
   // Collect all outputs from upstream nodes
   const allOutputs = Array.from(ctx.nodeOutputs.values());
@@ -556,7 +556,7 @@ async function executeProjectOrchestrator(node: WorkflowNode, ctx: ExecutionCont
   const voiceovers = allOutputs.filter(o => o._nodeType === 'voiceover_generator');
 
   ctx.emit({ type: 'log', nodeId: node.id, data: { 
-    message: `📊 Found ${elements.length} elements, ${photos.length} photos, ${videos.length} videos, ${voiceovers.length} voiceovers` 
+    message: `[chart] Found ${elements.length} elements, ${photos.length} photos, ${videos.length} videos, ${voiceovers.length} voiceovers` 
   }});
 
   return {
@@ -573,7 +573,7 @@ async function executeProjectOrchestrator(node: WorkflowNode, ctx: ExecutionCont
 }
 
 async function executeFinalVideoCompiler(node: WorkflowNode, ctx: ExecutionContext) {
-  ctx.emit({ type: 'log', nodeId: node.id, data: { message: `🎞️ Compiling final video...` } });
+  ctx.emit({ type: 'log', nodeId: node.id, data: { message: `[film] Compiling final video...` } });
 
   const allOutputs = Array.from(ctx.nodeOutputs.values());
   
@@ -592,7 +592,7 @@ async function executeFinalVideoCompiler(node: WorkflowNode, ctx: ExecutionConte
     .sort((a, b) => (a.sceneNumber || 0) - (b.sceneNumber || 0));
 
   if (videos.length === 0) {
-    ctx.emit({ type: 'log', nodeId: node.id, data: { message: `⚠️ No videos found to compile` } });
+    ctx.emit({ type: 'log', nodeId: node.id, data: { message: `[warn] No videos found to compile` } });
     return { _nodeType: 'final_video_compiler', finalVideoUrl: null, cost: 0 };
   }
 
@@ -612,7 +612,7 @@ async function executeFinalVideoCompiler(node: WorkflowNode, ctx: ExecutionConte
   
   if (videoIds.length >= 2) {
     try {
-      ctx.emit({ type: 'log', nodeId: node.id, data: { message: `🔗 Splicing ${videoIds.length} clips...` } });
+      ctx.emit({ type: 'log', nodeId: node.id, data: { message: `[link] Splicing ${videoIds.length} clips...` } });
       
       const baseId = videoIds[0];
       const spliceOverlays = videoIds.slice(1).map(id => `fl_splice,l_video:${id.replace(/\//g, ':')}`).join('/');
@@ -627,9 +627,9 @@ async function executeFinalVideoCompiler(node: WorkflowNode, ctx: ExecutionConte
       
       splicedVideoId = spliceResult.public_id;
       splicedVideoUrl = spliceResult.secure_url;
-      ctx.emit({ type: 'log', nodeId: node.id, data: { message: `✅ Video clips spliced: ${splicedVideoUrl}` } });
+      ctx.emit({ type: 'log', nodeId: node.id, data: { message: `[ok] Video clips spliced: ${splicedVideoUrl}` } });
     } catch (err: any) {
-      ctx.emit({ type: 'log', nodeId: node.id, data: { message: `⚠️ Splice failed: ${err.message}. Using first clip.` } });
+      ctx.emit({ type: 'log', nodeId: node.id, data: { message: `[warn] Splice failed: ${err.message}. Using first clip.` } });
       splicedVideoUrl = videos[0].videoUrl;
       splicedVideoId = videos[0].cloudinaryId;
     }
@@ -647,7 +647,7 @@ async function executeFinalVideoCompiler(node: WorkflowNode, ctx: ExecutionConte
     if (voiceIds.length >= 2) {
       // Splice multiple audio tracks together
       try {
-        ctx.emit({ type: 'log', nodeId: node.id, data: { message: `🔗 Concatenating ${voiceIds.length} voiceover tracks...` } });
+        ctx.emit({ type: 'log', nodeId: node.id, data: { message: `[link] Concatenating ${voiceIds.length} voiceover tracks...` } });
         const baseAudio = voiceIds[0];
         const audioSplice = voiceIds.slice(1).map(id => `fl_splice,l_video:${id.replace(/\//g, ':')}`).join('/');
         const audioSpliceUrl = `https://res.cloudinary.com/${cloudName}/video/upload/${audioSplice}/${baseAudio}.mp3`;
@@ -659,9 +659,9 @@ async function executeFinalVideoCompiler(node: WorkflowNode, ctx: ExecutionConte
           overwrite: true,
         });
         audioId = audioResult.public_id;
-        ctx.emit({ type: 'log', nodeId: node.id, data: { message: `✅ Audio tracks concatenated` } });
+        ctx.emit({ type: 'log', nodeId: node.id, data: { message: `[ok] Audio tracks concatenated` } });
       } catch (err: any) {
-        ctx.emit({ type: 'log', nodeId: node.id, data: { message: `⚠️ Audio concat failed: ${err.message}. Using first track.` } });
+        ctx.emit({ type: 'log', nodeId: node.id, data: { message: `[warn] Audio concat failed: ${err.message}. Using first track.` } });
         audioId = voiceIds[0];
       }
     } else if (voiceIds.length === 1) {
@@ -675,7 +675,7 @@ async function executeFinalVideoCompiler(node: WorkflowNode, ctx: ExecutionConte
 
   if (audioId && splicedVideoId) {
     try {
-      ctx.emit({ type: 'log', nodeId: node.id, data: { message: `🔊 Overlaying voiceover audio onto video...` } });
+      ctx.emit({ type: 'log', nodeId: node.id, data: { message: `[sound] Overlaying voiceover audio onto video...` } });
       
       // Cloudinary: overlay audio on video — use separate transformation steps (slash not comma)
       const audioOverlayId = audioId.replace(/\//g, ':');
@@ -694,7 +694,7 @@ async function executeFinalVideoCompiler(node: WorkflowNode, ctx: ExecutionConte
         });
       } catch (overlayErr: any) {
         // Method 2: Fallback — use Cloudinary SDK explicit API with eager transformation
-        ctx.emit({ type: 'log', nodeId: node.id, data: { message: `⚠️ URL overlay failed (${overlayErr.message}), trying SDK approach...` } });
+        ctx.emit({ type: 'log', nodeId: node.id, data: { message: `[warn] URL overlay failed (${overlayErr.message}), trying SDK approach...` } });
         
         finalResult = await cld.uploader.explicit(splicedVideoId, {
           type: 'upload',
@@ -718,10 +718,10 @@ async function executeFinalVideoCompiler(node: WorkflowNode, ctx: ExecutionConte
       
       finalUrl = finalResult.secure_url;
       finalPublicId = finalResult.public_id;
-      ctx.emit({ type: 'log', nodeId: node.id, data: { message: `✅ Final video WITH audio: ${finalUrl}` } });
+      ctx.emit({ type: 'log', nodeId: node.id, data: { message: `[ok] Final video WITH audio: ${finalUrl}` } });
     } catch (err: any) {
       ctx.emit({ type: 'log', nodeId: node.id, data: { 
-        message: `⚠️ Audio overlay failed: ${err.message}. Final video will be silent.` 
+        message: `[warn] Audio overlay failed: ${err.message}. Final video will be silent.` 
       }});
       // Fall back to video without audio — still save as final
       try {
@@ -736,7 +736,7 @@ async function executeFinalVideoCompiler(node: WorkflowNode, ctx: ExecutionConte
       } catch { /* keep splicedVideoUrl */ }
     }
   } else if (!audioId) {
-    ctx.emit({ type: 'log', nodeId: node.id, data: { message: `ℹ️ No voiceover audio found — final video will be silent` } });
+    ctx.emit({ type: 'log', nodeId: node.id, data: { message: `[info] No voiceover audio found — final video will be silent` } });
     // Still upload as final
     if (splicedVideoId) {
       try {
@@ -779,7 +779,7 @@ async function executeFinalVideoCompiler(node: WorkflowNode, ctx: ExecutionConte
 
 // Passthrough nodes
 async function executePassthrough(node: WorkflowNode, ctx: ExecutionContext) {
-  ctx.emit({ type: 'log', nodeId: node.id, data: { message: `✅ ${node.data.label} — passed through` } });
+  ctx.emit({ type: 'log', nodeId: node.id, data: { message: `[ok] ${node.data.label} — passed through` } });
   const upstream = getUpstream(ctx, node.id);
   return { _nodeType: node.data.type, ...(upstream[0] || {}), passthrough: true };
 }
@@ -892,14 +892,14 @@ export async function executeWorkflow(
   const errors: string[] = [];
   let executionRecoveryCount = 0;
 
-  emit({ type: 'log', data: { message: `▶️ Starting workflow execution: ${sorted.length} nodes` } });
+  emit({ type: 'log', data: { message: `[>] Starting workflow execution: ${sorted.length} nodes` } });
 
   for (const node of sorted) {
     const nodeType = node.data.type;
     const executor = EXECUTORS[nodeType];
 
     if (!executor) {
-      emit({ type: 'log', nodeId: node.id, nodeName: `${node.data.emoji} ${node.data.label}`, data: { message: `⚠️ No executor for type "${nodeType}", skipping` } });
+      emit({ type: 'log', nodeId: node.id, nodeName: `${node.data.emoji} ${node.data.label}`, data: { message: `[warn] No executor for type "${nodeType}", skipping` } });
       continue;
     }
 
@@ -932,7 +932,7 @@ export async function executeWorkflow(
         // Log recovery success if we recovered
         if (attempt > 0) {
           emit({ type: 'log', nodeId: node.id, data: { 
-            message: `⚡ Auto-recovered after ${attempt} attempt(s)! ${recoveryAttempts[recoveryAttempts.length - 1]?.reasoning || ''}`,
+            message: `[zap] Auto-recovered after ${attempt} attempt(s)! ${recoveryAttempts[recoveryAttempts.length - 1]?.reasoning || ''}`,
             recovery: true,
             attempts: recoveryAttempts,
           }});
@@ -1011,7 +1011,7 @@ export async function executeWorkflow(
               // Simple retry with wait
               if (decision.waitSeconds && decision.waitSeconds > 0) {
                 emit({ type: 'log', nodeId: node.id, data: { 
-                  message: `⏳ Waiting ${decision.waitSeconds}s before retry...`,
+                  message: `[timer] Waiting ${decision.waitSeconds}s before retry...`,
                   recovery: true,
                 }});
                 await sleep(decision.waitSeconds * 1000);
@@ -1046,7 +1046,7 @@ export async function executeWorkflow(
                   },
                 };
                 emit({ type: 'log', nodeId: node.id, data: { 
-                  message: `🔄 Switched model to ${decision.newModel}`,
+                  message: `[refresh] Switched model to ${decision.newModel}`,
                   recovery: true,
                 }});
               }
@@ -1072,7 +1072,7 @@ export async function executeWorkflow(
 
             case 'skip':
               emit({ type: 'log', nodeId: node.id, data: { 
-                message: `⏭️ Skipping node: ${decision.reasoning}`,
+                message: `[>>] Skipping node: ${decision.reasoning}`,
                 recovery: true,
               }});
               // Mark as "skipped" output so downstream knows

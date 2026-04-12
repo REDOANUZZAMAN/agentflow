@@ -87,12 +87,12 @@ export async function GET() {
   checks.env = {
     status: 'ok',
     detail: JSON.stringify({
-      SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL ? '✅ set' : '❌ missing',
-      SUPABASE_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? '✅ set' : '❌ missing',
-      ANTHROPIC_KEY: process.env.ANTHROPIC_API_KEY ? '✅ set' : '⚠️ optional',
-      OPENROUTER_KEY: process.env.OPENROUTER_API_KEY ? '✅ set' : '⚠️ optional',
-      FAL_KEY: process.env.FAL_API_KEY && process.env.FAL_API_KEY !== 'your_fal_api_key_here' ? '✅ set' : '⚠️ optional',
-      CLOUDINARY: process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_CLOUD_NAME !== 'your_cloud_name' ? '✅ set' : '⚠️ optional',
+      SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL ? '[ok] set' : '[x] missing',
+      SUPABASE_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? '[ok] set' : '[x] missing',
+      ANTHROPIC_KEY: process.env.ANTHROPIC_API_KEY ? '[ok] set' : '[warn] optional',
+      OPENROUTER_KEY: process.env.OPENROUTER_API_KEY ? '[ok] set' : '[warn] optional',
+      FAL_KEY: process.env.FAL_API_KEY && process.env.FAL_API_KEY !== 'your_fal_api_key_here' ? '[ok] set' : '[warn] optional',
+      CLOUDINARY: process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_CLOUD_NAME !== 'your_cloud_name' ? '[ok] set' : '[warn] optional',
     }),
   };
 

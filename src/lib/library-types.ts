@@ -91,9 +91,9 @@ export function formatDate(dateStr: string): string {
 
 export function getAssetIcon(type: AssetType): string {
   switch (type) {
-    case 'photo': return '🖼️';
-    case 'video': return '🎬';
-    case 'audio': return '🔊';
-    default: return '📄';
+    case 'photo': return '[image]';
+    case 'video': return '[video]';
+    case 'audio': return '[sound]';
+    default: return '[doc]';
   }
 }

@@ -51,79 +51,79 @@ export interface NodeCategory {
 export const NODE_CATEGORIES: NodeCategory[] = [
   {
     name: 'Triggers',
-    emoji: '⚡',
+    emoji: '[zap]',
     types: [
-      { type: 'manual_trigger', label: 'Manual Trigger', description: 'Run manually with a button click', emoji: '👆' },
-      { type: 'schedule_trigger', label: 'Schedule', description: 'Run on a schedule (daily, hourly, etc.)', emoji: '⏰' },
-      { type: 'webhook_trigger', label: 'Webhook', description: 'Run when a URL is called', emoji: '🔗' },
+      { type: 'manual_trigger', label: 'Manual Trigger', description: 'Run manually with a button click', emoji: '[click]' },
+      { type: 'schedule_trigger', label: 'Schedule', description: 'Run on a schedule (daily, hourly, etc.)', emoji: '[clock]' },
+      { type: 'webhook_trigger', label: 'Webhook', description: 'Run when a URL is called', emoji: '[link]' },
     ],
   },
   {
     name: 'AI',
-    emoji: '🤖',
+    emoji: '[bot]',
     types: [
-      { type: 'claude_chat', label: 'Claude AI', description: 'Generate text with Claude', emoji: '🧠' },
-      { type: 'image_gen', label: 'Image Generator', description: 'Create images with AI', emoji: '🎨' },
-      { type: 'video_gen', label: 'Video Generator', description: 'Create videos with AI', emoji: '🎬' },
-      { type: 'voice_gen', label: 'Voice Generator', description: 'Create audio with AI', emoji: '🎤' },
+      { type: 'claude_chat', label: 'Claude AI', description: 'Generate text with Claude', emoji: '[brain]' },
+      { type: 'image_gen', label: 'Image Generator', description: 'Create images with AI', emoji: '[art]' },
+      { type: 'video_gen', label: 'Video Generator', description: 'Create videos with AI', emoji: '[video]' },
+      { type: 'voice_gen', label: 'Voice Generator', description: 'Create audio with AI', emoji: '[mic]' },
     ],
   },
   {
     name: 'Social',
-    emoji: '📱',
+    emoji: '[mobile]',
     types: [
-      { type: 'post_x', label: 'Post to X', description: 'Post a tweet on X (Twitter)', emoji: '🐦' },
-      { type: 'post_instagram', label: 'Post to Instagram', description: 'Post to Instagram', emoji: '📸' },
-      { type: 'post_linkedin', label: 'Post to LinkedIn', description: 'Post to LinkedIn', emoji: '💼' },
-      { type: 'post_tiktok', label: 'Post to TikTok', description: 'Post to TikTok', emoji: '🎵' },
+      { type: 'post_x', label: 'Post to X', description: 'Post a tweet on X (Twitter)', emoji: '[bird]' },
+      { type: 'post_instagram', label: 'Post to Instagram', description: 'Post to Instagram', emoji: '[photo]' },
+      { type: 'post_linkedin', label: 'Post to LinkedIn', description: 'Post to LinkedIn', emoji: '[briefcase]' },
+      { type: 'post_tiktok', label: 'Post to TikTok', description: 'Post to TikTok', emoji: '[music]' },
     ],
   },
   {
     name: 'Communications',
-    emoji: '💬',
+    emoji: '[chat]',
     types: [
-      { type: 'send_email', label: 'Send Email', description: 'Send an email via Gmail/Resend', emoji: '📧' },
-      { type: 'send_telegram', label: 'Send Telegram', description: 'Send a Telegram message', emoji: '✈️' },
+      { type: 'send_email', label: 'Send Email', description: 'Send an email via Gmail/Resend', emoji: '[email]' },
+      { type: 'send_telegram', label: 'Send Telegram', description: 'Send a Telegram message', emoji: '[send]' },
     ],
   },
   {
     name: 'Web',
-    emoji: '🌐',
+    emoji: '[globe]',
     types: [
-      { type: 'http_request', label: 'HTTP Request', description: 'Make an API call to any URL', emoji: '🔌' },
-      { type: 'web_search', label: 'Web Search', description: 'Search the web for information', emoji: '🔍' },
-      { type: 'web_scraper', label: 'Web Scraper', description: 'Extract data from a webpage', emoji: '🕷️' },
+      { type: 'http_request', label: 'HTTP Request', description: 'Make an API call to any URL', emoji: '[plug]' },
+      { type: 'web_search', label: 'Web Search', description: 'Search the web for information', emoji: '[search]' },
+      { type: 'web_scraper', label: 'Web Scraper', description: 'Extract data from a webpage', emoji: '[spider]' },
     ],
   },
   {
     name: 'Files',
-    emoji: '📁',
+    emoji: '[folder]',
     types: [
-      { type: 'file_read', label: 'Read File', description: 'Read a file', emoji: '📖' },
-      { type: 'file_write', label: 'Write File', description: 'Write/create a file', emoji: '✏️' },
-      { type: 'file_generate', label: 'Generate File', description: 'Generate a PDF/doc', emoji: '📄' },
+      { type: 'file_read', label: 'Read File', description: 'Read a file', emoji: '[book]' },
+      { type: 'file_write', label: 'Write File', description: 'Write/create a file', emoji: '[pencil]' },
+      { type: 'file_generate', label: 'Generate File', description: 'Generate a PDF/doc', emoji: '[doc]' },
     ],
   },
   {
     name: 'Video Pipeline',
-    emoji: '🎥',
+    emoji: '[camera]',
     types: [
-      { type: 'script_parser', label: 'Script Parser', description: 'Parse a script into scenes & shots', emoji: '📜' },
-      { type: 'element_reference', label: 'Element Reference', description: 'Generate consistent character/location refs', emoji: '🎭' },
-      { type: 'photo_generator', label: 'Photo Generator', description: 'Generate shot photos via fal.ai', emoji: '📸' },
-      { type: 'video_generator', label: 'Video Generator (fal)', description: 'Generate shot videos via fal.ai', emoji: '🎬' },
-      { type: 'voiceover_generator', label: 'Voiceover Generator', description: 'Generate voiceover audio via fal.ai TTS', emoji: '🗣️' },
-      { type: 'project_orchestrator', label: 'Project Orchestrator', description: 'Run full script-to-video pipeline', emoji: '🎯' },
-      { type: 'final_video_compiler', label: 'Final Video Compiler', description: 'Merge all shots into one video with transitions & audio', emoji: '🎞️' },
+      { type: 'script_parser', label: 'Script Parser', description: 'Parse a script into scenes & shots', emoji: '[scroll]' },
+      { type: 'element_reference', label: 'Element Reference', description: 'Generate consistent character/location refs', emoji: '[masks]' },
+      { type: 'photo_generator', label: 'Photo Generator', description: 'Generate shot photos via fal.ai', emoji: '[photo]' },
+      { type: 'video_generator', label: 'Video Generator (fal)', description: 'Generate shot videos via fal.ai', emoji: '[video]' },
+      { type: 'voiceover_generator', label: 'Voiceover Generator', description: 'Generate voiceover audio via fal.ai TTS', emoji: '[voice]' },
+      { type: 'project_orchestrator', label: 'Project Orchestrator', description: 'Run full script-to-video pipeline', emoji: '[target]' },
+      { type: 'final_video_compiler', label: 'Final Video Compiler', description: 'Merge all shots into one video with transitions & audio', emoji: '[film]' },
     ],
   },
   {
     name: 'Logic',
-    emoji: '⚙️',
+    emoji: '[gear]',
     types: [
-      { type: 'if_else', label: 'If/Else', description: 'Branch based on a condition', emoji: '🔀' },
-      { type: 'loop', label: 'Loop', description: 'Repeat steps for each item', emoji: '🔁' },
-      { type: 'wait', label: 'Wait', description: 'Pause for a set time', emoji: '⏳' },
+      { type: 'if_else', label: 'If/Else', description: 'Branch based on a condition', emoji: '[branch]' },
+      { type: 'loop', label: 'Loop', description: 'Repeat steps for each item', emoji: '[loop]' },
+      { type: 'wait', label: 'Wait', description: 'Pause for a set time', emoji: '[timer]' },
     ],
   },
 ];
@@ -133,7 +133,7 @@ export function getNodeMeta(type: NodeType) {
     const found = cat.types.find((t) => t.type === type);
     if (found) return { ...found, category: cat.name, categoryEmoji: cat.emoji };
   }
-  return { type, label: type, description: '', emoji: '❓', category: 'Unknown', categoryEmoji: '❓' };
+  return { type, label: type, description: '', emoji: '[?]', category: 'Unknown', categoryEmoji: '[?]' };
 }
 
 // Node config for the canvas

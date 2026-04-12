@@ -154,7 +154,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Demo: use a placeholder video URL
-  const finalVideoUrl = `https://placehold.co/${width}x${height}/1a1a2e/ef4444.${outputFormat === 'mp4' ? 'png' : 'png'}?text=🎬+Final+Video+(${Math.round(totalDuration)}s)`;
+  const finalVideoUrl = `https://placehold.co/${width}x${height}/1a1a2e/ef4444.${outputFormat === 'mp4' ? 'png' : 'png'}?text=[video]+Final+Video+(${Math.round(totalDuration)}s)`;
 
   const result = {
     success: true,
@@ -192,7 +192,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     projectId,
     status: 'completed',
-    finalVideoUrl: `https://placehold.co/1920x1080/1a1a2e/ef4444.png?text=🎬+Final+Video`,
+    finalVideoUrl: `https://placehold.co/1920x1080/1a1a2e/ef4444.png?text=[video]+Final+Video`,
     duration: 71.4,
     fileSize: 187_170_816,
     completedAt: new Date().toISOString(),

@@ -49,7 +49,7 @@ export default function TaskListCard() {
         {/* Current task name */}
         <span className="text-xs text-[var(--muted-foreground)] truncate max-w-[140px]">
           {allDone
-            ? '✨ All done!'
+            ? '[sparkle] All done!'
             : running
               ? running.title
               : 'Waiting...'}
@@ -169,7 +169,7 @@ export function FloatingTaskWidget() {
 
         <div className="min-w-0">
           <p className="text-[11px] font-semibold text-[var(--foreground)] truncate">
-            {allDone ? '✨ All tasks complete!' : running ? running.title : 'Building workflow...'}
+            {allDone ? '[sparkle] All tasks complete!' : running ? running.title : 'Building workflow...'}
           </p>
           <p className="text-[9px] text-[var(--muted-foreground)]">
             {done} of {total} steps done

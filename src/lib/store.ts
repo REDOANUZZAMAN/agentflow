@@ -54,7 +54,7 @@ export const initialState: AppState = {
   nodes: [],
   edges: [],
   workflowName: 'My Workflow',
-  workflowEmoji: '🤖',
+  workflowEmoji: '[bot]',
 
   messages: [
     {
@@ -63,11 +63,11 @@ export const initialState: AppState = {
       content: `👋 **Hi! I'm your AI Agent Builder.**\n\nTell me what you want your agent to do, and I'll build it right here on the canvas. You'll see every step as I create it!\n\nHere are some ideas to get started:`,
       timestamp: new Date(),
       buttons: [
-        { label: '📧 Daily news summary by email', action: 'Make me an agent that writes a daily news summary and emails it to me' },
-        { label: '🐦 Auto-post to social media', action: 'Create an agent that generates a motivational quote and posts it to Twitter every morning' },
-        { label: '😂 Daily joke by email', action: 'Send me a daily joke by email every morning at 8am' },
-        { label: '🔍 Web monitor with alerts', action: 'Monitor a website for changes and send me a Telegram message when something changes' },
-        { label: '🎬 Script to video', action: 'I have a script with scenes and shots. Build me a pipeline that generates photos, videos, and voiceovers for each shot using fal.ai and organizes everything in Cloudinary.' },
+        { label: '[email] Daily news summary by email', action: 'Make me an agent that writes a daily news summary and emails it to me' },
+        { label: '[bird] Auto-post to social media', action: 'Create an agent that generates a motivational quote and posts it to Twitter every morning' },
+        { label: '[joke] Daily joke by email', action: 'Send me a daily joke by email every morning at 8am' },
+        { label: '[search] Web monitor with alerts', action: 'Monitor a website for changes and send me a Telegram message when something changes' },
+        { label: '[video] Script to video', action: 'I have a script with scenes and shots. Build me a pipeline that generates photos, videos, and voiceovers for each shot using fal.ai and organizes everything in Cloudinary.' },
       ],
     },
   ],

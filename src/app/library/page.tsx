@@ -141,7 +141,7 @@ export default function LibraryPage() {
         wfMap.set(wf.id, {
           id: wf.id,
           name: wf.name || 'Untitled Workflow',
-          emoji: wf.emoji || '🤖',
+          emoji: wf.emoji || '[bot]',
           updated_at: wf.updated_at,
           runs: [],
           totalAssets: 0,
@@ -211,7 +211,7 @@ export default function LibraryPage() {
         wfMap.set('__unlinked__', {
           id: '__unlinked__',
           name: 'Unorganized Assets',
-          emoji: '📦',
+          emoji: '[box]',
           updated_at: unlinkedAssets[0].created_at,
           runs: [{ execution_id: 'unlinked', started_at: unlinkedAssets[0].created_at, status: 'done', assets: unlinkedAssets }],
           totalAssets: unlinkedAssets.length,
@@ -305,7 +305,7 @@ export default function LibraryPage() {
         <div className="w-64 flex-shrink-0 border-r border-[var(--border)] overflow-y-auto bg-[var(--card)]">
           <div className="p-3">
             <button onClick={() => { setSelectedWorkflow(null); setSelectedRun(null); }} className={`w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition-colors ${!selectedWorkflow ? 'bg-[var(--primary)]/10 text-[var(--primary)]' : 'text-[var(--foreground)] hover:bg-[var(--secondary)]'}`}>
-              📁 All Workflows
+              [folder] All Workflows
             </button>
           </div>
 
@@ -438,7 +438,7 @@ export default function LibraryPage() {
                 {finalAssets.length > 0 && (
                   <div>
                     <div className="flex items-center gap-2 mb-2 text-xs font-semibold text-[var(--foreground)]">
-                      <Film className="w-4 h-4 text-yellow-400" /> 🎬 Final Video
+                      <Film className="w-4 h-4 text-yellow-400" /> [video] Final Video
                     </div>
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                       {finalAssets.map(asset => <AssetCard key={asset.id} asset={asset} selected={selectedAsset?.id === asset.id} onClick={() => setSelectedAsset(asset)} />)}
@@ -450,7 +450,7 @@ export default function LibraryPage() {
                 {elements.length > 0 && (
                   <details open>
                     <summary className="flex items-center gap-2 mb-2 text-xs font-semibold text-[var(--foreground)] cursor-pointer select-none hover:text-[var(--primary)]">
-                      <FolderOpen className="w-4 h-4 text-purple-400" /> 📁 Elements ({elements.length})
+                      <FolderOpen className="w-4 h-4 text-purple-400" /> [folder] Elements ({elements.length})
                     </summary>
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 ml-4">
                       {elements.map(asset => <AssetCard key={asset.id} asset={asset} selected={selectedAsset?.id === asset.id} onClick={() => setSelectedAsset(asset)} />)}
@@ -462,13 +462,13 @@ export default function LibraryPage() {
                 {Array.from(sceneMap.entries()).sort(([a], [b]) => a - b).map(([sceneNum, shotMap]) => (
                   <details key={`scene-${sceneNum}`} open>
                     <summary className="flex items-center gap-2 mb-2 text-xs font-semibold text-[var(--foreground)] cursor-pointer select-none hover:text-[var(--primary)]">
-                      <FolderOpen className="w-4 h-4 text-blue-400" /> 📁 Scene {sceneNum} ({Array.from(shotMap.values()).flat().length} assets, {shotMap.size} shots)
+                      <FolderOpen className="w-4 h-4 text-blue-400" /> [folder] Scene {sceneNum} ({Array.from(shotMap.values()).flat().length} assets, {shotMap.size} shots)
                     </summary>
                     <div className="ml-4 space-y-3">
                       {Array.from(shotMap.entries()).sort(([a], [b]) => a - b).map(([shotNum, assets]) => (
                         <details key={`shot-${sceneNum}-${shotNum}`} open>
                           <summary className="flex items-center gap-2 mb-1.5 text-[11px] font-medium text-[var(--muted-foreground)] cursor-pointer select-none hover:text-[var(--foreground)]">
-                            <FolderOpen className="w-3.5 h-3.5 text-green-400" /> 📁 Shot {shotNum} ({assets.length})
+                            <FolderOpen className="w-3.5 h-3.5 text-green-400" /> [folder] Shot {shotNum} ({assets.length})
                           </summary>
                           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 ml-4">
                             {assets.sort((a, b) => {

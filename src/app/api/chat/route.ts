@@ -30,7 +30,7 @@ async function getSupabaseToken(): Promise<string | null> {
     if (!error && data?.session?.access_token) {
       cachedToken = data.session.access_token;
       tokenExpiry = Date.now() + (data.session.expires_in || 3600) * 1000;
-      console.log('🔑 Got anonymous Supabase token for Railway');
+      console.log('[key] Got anonymous Supabase token for Railway');
       return cachedToken;
     }
     
@@ -45,12 +45,12 @@ async function getSupabaseToken(): Promise<string | null> {
       if (!signInError && signInData?.session?.access_token) {
         cachedToken = signInData.session.access_token;
         tokenExpiry = Date.now() + (signInData.session.expires_in || 3600) * 1000;
-        console.log('🔑 Got service account Supabase token for Railway');
+        console.log('[key] Got service account Supabase token for Railway');
         return cachedToken;
       }
     }
   } catch (err: any) {
-    console.warn('⚠️ Could not get Supabase token:', err.message);
+    console.warn('[warn] Could not get Supabase token:', err.message);
   }
   
   return null;
@@ -186,7 +186,7 @@ ALWAYS CONFIRM BEFORE: posting to social media, sending emails/messages, costs o
 ## Position Guide
 Place nodes vertically with 150px gaps. Start at x:300, y:80. Each subsequent node goes at y + 150.
 
-Remember: The user can SEE the canvas updating in real-time as you use your tools. Make it feel like magic! ✨`;
+Remember: The user can SEE the canvas updating in real-time as you use your tools. Make it feel like magic! [sparkle]`;
 
 export async function POST(req: NextRequest) {
   try {
@@ -203,10 +203,10 @@ export async function POST(req: NextRequest) {
     if (supabaseUrl && supabaseAnonKey) {
       try {
         const result = await callSupabaseClaudeProxy(message, history, nodes, edges, supabaseUrl, supabaseAnonKey);
-        console.log('✅ Supabase Claude proxy succeeded');
+        console.log('[ok] Supabase Claude proxy succeeded');
         return NextResponse.json(result);
       } catch (proxyError: any) {
-        console.warn('❌ Supabase Claude proxy failed:', proxyError.message);
+        console.warn('[x] Supabase Claude proxy failed:', proxyError.message);
       }
     }
 
@@ -221,10 +221,10 @@ export async function POST(req: NextRequest) {
       for (const model of models) {
         try {
           const result = await callOpenRouterAPI(message, history, nodes, edges, openrouterKey, model);
-          console.log(`✅ OpenRouter API succeeded (model: ${model})`);
+          console.log(`[ok] OpenRouter API succeeded (model: ${model})`);
           return NextResponse.json(result);
         } catch (apiError: any) {
-          console.warn(`❌ OpenRouter model ${model} failed:`, apiError.message);
+          console.warn(`[x] OpenRouter model ${model} failed:`, apiError.message);
         }
       }
     }
@@ -386,7 +386,7 @@ async function callSupabaseClaudeProxy(
   let plannedTaskCount = 0;
 
   for (let round = 0; round < MAX_ROUNDS; round++) {
-    console.log(`🔄 Tool loop round ${round + 1}/${MAX_ROUNDS} (${allToolCalls.filter(t => t.name === 'add_node').length} nodes so far)`);
+    console.log(`[refresh] Tool loop round ${round + 1}/${MAX_ROUNDS} (${allToolCalls.filter(t => t.name === 'add_node').length} nodes so far)`);
     const data = await callProxy(currentMessages);
     const { text, tools, stopReason } = processResponse(data);
     
@@ -403,7 +403,7 @@ async function callSupabaseClaudeProxy(
       
       if (addNodeCount >= 2 && !workflowComplete && continuationCount < MAX_CONTINUATIONS && nodeDeficit > 0) {
         continuationCount++;
-        console.log(`🔁 Auto-continue #${continuationCount}: ${addNodeCount} nodes built, ~${nodeDeficit} remaining`);
+        console.log(`[loop] Auto-continue #${continuationCount}: ${addNodeCount} nodes built, ~${nodeDeficit} remaining`);
         currentMessages = [
           ...currentMessages,
           { role: 'assistant', content: data.content },
@@ -463,7 +463,7 @@ async function callSupabaseClaudeProxy(
         const prompt = nodeDeficit > 0
           ? `Good progress! ${addNodeCount} nodes created, but ${nodeDeficit} more are needed per your task list. Continue adding all remaining nodes with add_node, connect them with connect_nodes, then call workflow_ready() when completely done.`
           : `Continue building the rest of the workflow. Add all remaining nodes and connections, then call workflow_ready() when done.`;
-        console.log(`🔁 Auto-continue #${continuationCount} (end_turn with tools): ${addNodeCount} nodes, ${nodeDeficit} deficit`);
+        console.log(`[loop] Auto-continue #${continuationCount} (end_turn with tools): ${addNodeCount} nodes, ${nodeDeficit} deficit`);
         currentMessages = [
           ...currentMessages,
           { role: 'assistant', content: data.content },
@@ -482,7 +482,7 @@ async function callSupabaseClaudeProxy(
     ];
   }
 
-  console.log(`✅ Tool loop done: ${allToolCalls.filter(t => t.name === 'add_node').length} nodes, ${allToolCalls.filter(t => t.name === 'connect_nodes').length} edges, ${continuationCount} continuations, workflow_ready=${workflowComplete}`);
+  console.log(`[ok] Tool loop done: ${allToolCalls.filter(t => t.name === 'add_node').length} nodes, ${allToolCalls.filter(t => t.name === 'connect_nodes').length} edges, ${continuationCount} continuations, workflow_ready=${workflowComplete}`);
 
   // Auto-track task progress: generate synthetic start_task/complete_task calls
   // based on actual add_node calls, so the client task list updates correctly
@@ -534,7 +534,7 @@ async function callSupabaseClaudeProxy(
         default: return `Performed ${tc.name}`;
       }
     });
-    allText = actions.join('\n\n') + '\n\n✨ Your workflow is taking shape!';
+    allText = actions.join('\n\n') + '\n\n[sparkle] Your workflow is taking shape!';
   }
 
   return {
@@ -544,8 +544,8 @@ async function callSupabaseClaudeProxy(
     provider: 'supabase-claude',
     buttons: allToolCalls.some((tc: any) => tc.name === 'add_node')
       ? [
-          { label: '▶️ Run Workflow', action: 'Run the workflow to test it' },
-          { label: '✏️ Make Changes', action: 'What changes can you make to this workflow?' },
+          { label: '[>] Run Workflow', action: 'Run the workflow to test it' },
+          { label: '[pencil] Make Changes', action: 'What changes can you make to this workflow?' },
         ]
       : undefined,
   };
@@ -655,8 +655,8 @@ async function callRailwayAPI(message: string, history: any[], nodes: any[], edg
     provider: 'railway-claude',
     buttons: textContent.toLowerCase().includes('schedule') || textContent.toLowerCase().includes('trigger')
       ? [
-          { label: '▶️ Run Workflow', action: 'Run the workflow to test it' },
-          { label: '✏️ Make Changes', action: 'What changes can you make to this workflow?' },
+          { label: '[>] Run Workflow', action: 'Run the workflow to test it' },
+          { label: '[pencil] Make Changes', action: 'What changes can you make to this workflow?' },
         ]
       : undefined,
   };
@@ -781,7 +781,7 @@ async function callOpenRouterAPI(message: string, history: any[], nodes: any[], 
         default: return `Performed ${tc.name}`;
       }
     });
-    textContent = actions.join('\n\n') + '\n\n✨ Your workflow is taking shape! Want me to make any changes or shall we test it?';
+    textContent = actions.join('\n\n') + '\n\n[sparkle] Your workflow is taking shape! Want me to make any changes or shall we test it?';
   }
 
   return {
@@ -790,8 +790,8 @@ async function callOpenRouterAPI(message: string, history: any[], nodes: any[], 
     nodeIdMap,
     buttons: toolCalls.some((tc: any) => tc.name === 'add_node')
       ? [
-          { label: '▶️ Run Workflow', action: 'Run the workflow to test it' },
-          { label: '✏️ Make Changes', action: 'What changes can you make to this workflow?' },
+          { label: '[>] Run Workflow', action: 'Run the workflow to test it' },
+          { label: '[pencil] Make Changes', action: 'What changes can you make to this workflow?' },
         ]
       : undefined,
   };
@@ -949,7 +949,7 @@ async function callClaudeAPI(message: string, history: any[], nodes: any[], edge
         }
       });
       
-      textContent = actions.join('\n\n') + '\n\n✨ Your workflow is taking shape! Want me to make any changes or shall we test it?';
+      textContent = actions.join('\n\n') + '\n\n[sparkle] Your workflow is taking shape! Want me to make any changes or shall we test it?';
     }
 
     return {
@@ -958,8 +958,8 @@ async function callClaudeAPI(message: string, history: any[], nodes: any[], edge
       nodeIdMap,
       buttons: toolCalls.some((tc: any) => tc.name === 'add_node')
         ? [
-            { label: '▶️ Run Workflow', action: 'Run the workflow to test it' },
-            { label: '✏️ Make Changes', action: 'What changes can you make to this workflow?' },
+            { label: '[>] Run Workflow', action: 'Run the workflow to test it' },
+            { label: '[pencil] Make Changes', action: 'What changes can you make to this workflow?' },
           ]
         : undefined,
     };
@@ -984,7 +984,7 @@ function simulateResponse(message: string, nodes: any[], edges: any[]) {
     return simulateRun(nodes);
   } else if (lowerMsg.includes('change') || lowerMsg.includes('modify') || lowerMsg.includes('edit')) {
     return {
-      response: "Sure! What would you like to change? I can:\n\n- 🔄 **Modify** any node's settings\n- ➕ **Add** new steps to the workflow\n- 🗑️ **Remove** steps you don't need\n- 🔗 **Reconnect** the flow differently\n\nJust tell me what you'd like to adjust!",
+      response: "Sure! What would you like to change? I can:\n\n- [refresh] **Modify** any node's settings\n- [+] **Add** new steps to the workflow\n- [trash] **Remove** steps you don't need\n- [link] **Reconnect** the flow differently\n\nJust tell me what you'd like to adjust!",
       toolCalls: [],
     };
   } else {
@@ -1011,7 +1011,7 @@ function buildJokeEmailWorkflow(existingNodes: any[]) {
         nodeId: `node_${Date.now()}_1`,
         type: 'schedule_trigger',
         label: 'Schedule',
-        emoji: '⏰',
+        emoji: '[clock]',
         config: { schedule: 'every day at 8am', cron: '0 8 * * *' },
         position: { x: 300, y: baseY },
       },
@@ -1025,7 +1025,7 @@ function buildJokeEmailWorkflow(existingNodes: any[]) {
         nodeId: `node_${Date.now()}_2`,
         type: 'claude_chat',
         label: 'Claude AI',
-        emoji: '🧠',
+        emoji: '[brain]',
         config: { prompt: 'Tell me a funny, family-friendly joke. Be creative and surprising!', model: 'claude-sonnet-4-6' },
         position: { x: 300, y: baseY + 150 },
       },
@@ -1034,13 +1034,13 @@ function buildJokeEmailWorkflow(existingNodes: any[]) {
     {
       id: 'tc_3',
       name: 'add_node',
-      input: { type: 'send_email', config: { subject: '😂 Your Daily Joke', to: 'you@example.com' } },
+      input: { type: 'send_email', config: { subject: '[joke] Your Daily Joke', to: 'you@example.com' } },
       result: {
         nodeId: `node_${Date.now()}_3`,
         type: 'send_email',
         label: 'Send Email',
-        emoji: '📧',
-        config: { subject: '😂 Your Daily Joke', to: 'you@example.com' },
+        emoji: '[email]',
+        config: { subject: '[joke] Your Daily Joke', to: 'you@example.com' },
         position: { x: 300, y: baseY + 300 },
       },
       status: 'done',
@@ -1062,14 +1062,14 @@ function buildJokeEmailWorkflow(existingNodes: any[]) {
   ];
 
   return {
-    response: `Great choice! 😄 Here's what I'm building for you:\n\n1. ⏰ **Schedule Trigger** — Fires every morning at 8am\n2. 🧠 **Claude AI** — Generates a fresh, funny joke\n3. 📧 **Send Email** — Delivers the joke to your inbox\n\nI've set it all up and connected the steps! The workflow is called **😂 Daily Joke Machine**.\n\nWant me to run a test? You'll see a joke appear in your email right away!`,
+    response: `Great choice! [smile] Here's what I'm building for you:\n\n1. [clock] **Schedule Trigger** — Fires every morning at 8am\n2. [brain] **Claude AI** — Generates a fresh, funny joke\n3. [email] **Send Email** — Delivers the joke to your inbox\n\nI've set it all up and connected the steps! The workflow is called **[joke] Daily Joke Machine**.\n\nWant me to run a test? You'll see a joke appear in your email right away!`,
     toolCalls,
     taskList,
-    workflowName: '😂 Daily Joke Machine',
-    workflowEmoji: '😂',
+    workflowName: '[joke] Daily Joke Machine',
+    workflowEmoji: '[joke]',
     buttons: [
-      { label: '▶️ Run Test', action: 'Run the workflow to test it' },
-      { label: '✏️ Change Email', action: 'Change the email address for the joke workflow' },
+      { label: '[>] Run Test', action: 'Run the workflow to test it' },
+      { label: '[pencil] Change Email', action: 'Change the email address for the joke workflow' },
     ],
   };
 }
@@ -1081,37 +1081,37 @@ function buildNewsSummaryWorkflow(existingNodes: any[]) {
     {
       id: 'tc_1', name: 'add_node',
       input: { type: 'schedule_trigger', config: { schedule: 'every day at 7am' } },
-      result: { nodeId: `node_${now}_1`, type: 'schedule_trigger', label: 'Schedule', emoji: '⏰', config: { schedule: 'every day at 7am' }, position: { x: 300, y: baseY } },
+      result: { nodeId: `node_${now}_1`, type: 'schedule_trigger', label: 'Schedule', emoji: '[clock]', config: { schedule: 'every day at 7am' }, position: { x: 300, y: baseY } },
       status: 'done',
     },
     {
       id: 'tc_2', name: 'add_node',
       input: { type: 'web_search', config: { query: 'top news today' } },
-      result: { nodeId: `node_${now}_2`, type: 'web_search', label: 'Web Search', emoji: '🔍', config: { query: 'top news today' }, position: { x: 300, y: baseY + 150 } },
+      result: { nodeId: `node_${now}_2`, type: 'web_search', label: 'Web Search', emoji: '[search]', config: { query: 'top news today' }, position: { x: 300, y: baseY + 150 } },
       status: 'done',
     },
     {
       id: 'tc_3', name: 'add_node',
       input: { type: 'claude_chat', config: { prompt: 'Summarize these news articles into a brief, easy-to-read email newsletter' } },
-      result: { nodeId: `node_${now}_3`, type: 'claude_chat', label: 'Claude AI', emoji: '🧠', config: { prompt: 'Summarize these news articles into a brief, easy-to-read newsletter' }, position: { x: 300, y: baseY + 300 } },
+      result: { nodeId: `node_${now}_3`, type: 'claude_chat', label: 'Claude AI', emoji: '[brain]', config: { prompt: 'Summarize these news articles into a brief, easy-to-read newsletter' }, position: { x: 300, y: baseY + 300 } },
       status: 'done',
     },
     {
       id: 'tc_4', name: 'add_node',
-      input: { type: 'send_email', config: { subject: '📰 Your Daily News Summary', to: 'you@example.com' } },
-      result: { nodeId: `node_${now}_4`, type: 'send_email', label: 'Send Email', emoji: '📧', config: { subject: '📰 Your Daily News Summary', to: 'you@example.com' }, position: { x: 300, y: baseY + 450 } },
+      input: { type: 'send_email', config: { subject: '[news] Your Daily News Summary', to: 'you@example.com' } },
+      result: { nodeId: `node_${now}_4`, type: 'send_email', label: 'Send Email', emoji: '[email]', config: { subject: '[news] Your Daily News Summary', to: 'you@example.com' }, position: { x: 300, y: baseY + 450 } },
       status: 'done',
     },
   ];
 
   return {
-    response: `📰 Building your daily news agent! Here's the plan:\n\n1. ⏰ **Schedule** — Every morning at 7am\n2. 🔍 **Web Search** — Finds today's top news\n3. 🧠 **Claude AI** — Writes a clean, readable summary\n4. 📧 **Send Email** — Delivers it to your inbox\n\nYour **📰 Morning Briefing Bot** is ready! Want to test it?`,
+    response: `[news] Building your daily news agent! Here's the plan:\n\n1. [clock] **Schedule** — Every morning at 7am\n2. [search] **Web Search** — Finds today's top news\n3. [brain] **Claude AI** — Writes a clean, readable summary\n4. [email] **Send Email** — Delivers it to your inbox\n\nYour **[news] Morning Briefing Bot** is ready! Want to test it?`,
     toolCalls,
-    workflowName: '📰 Morning Briefing Bot',
-    workflowEmoji: '📰',
+    workflowName: '[news] Morning Briefing Bot',
+    workflowEmoji: '[news]',
     buttons: [
-      { label: '▶️ Run Test', action: 'Run the workflow to test it' },
-      { label: '🐦 Also post to Twitter', action: 'Add a step that posts the summary to Twitter too' },
+      { label: '[>] Run Test', action: 'Run the workflow to test it' },
+      { label: '[bird] Also post to Twitter', action: 'Add a step that posts the summary to Twitter too' },
     ],
   };
 }
@@ -1123,31 +1123,31 @@ function buildSocialPostWorkflow(existingNodes: any[]) {
     {
       id: 'tc_1', name: 'add_node',
       input: { type: 'schedule_trigger', config: { schedule: 'every day at 9am' } },
-      result: { nodeId: `node_${now}_1`, type: 'schedule_trigger', label: 'Schedule', emoji: '⏰', config: { schedule: 'every day at 9am' }, position: { x: 300, y: baseY } },
+      result: { nodeId: `node_${now}_1`, type: 'schedule_trigger', label: 'Schedule', emoji: '[clock]', config: { schedule: 'every day at 9am' }, position: { x: 300, y: baseY } },
       status: 'done',
     },
     {
       id: 'tc_2', name: 'add_node',
       input: { type: 'claude_chat', config: { prompt: 'Generate an inspiring motivational quote with a relevant emoji. Keep it under 280 characters.' } },
-      result: { nodeId: `node_${now}_2`, type: 'claude_chat', label: 'Claude AI', emoji: '🧠', config: { prompt: 'Generate an inspiring motivational quote. Keep it under 280 characters.' }, position: { x: 300, y: baseY + 150 } },
+      result: { nodeId: `node_${now}_2`, type: 'claude_chat', label: 'Claude AI', emoji: '[brain]', config: { prompt: 'Generate an inspiring motivational quote. Keep it under 280 characters.' }, position: { x: 300, y: baseY + 150 } },
       status: 'done',
     },
     {
       id: 'tc_3', name: 'add_node',
       input: { type: 'post_x', config: {} },
-      result: { nodeId: `node_${now}_3`, type: 'post_x', label: 'Post to X', emoji: '🐦', config: {}, position: { x: 300, y: baseY + 300 } },
+      result: { nodeId: `node_${now}_3`, type: 'post_x', label: 'Post to X', emoji: '[bird]', config: {}, position: { x: 300, y: baseY + 300 } },
       status: 'done',
     },
   ];
 
   return {
-    response: `🐦 Here's your social media agent:\n\n1. ⏰ **Schedule** — Every morning at 9am\n2. 🧠 **Claude AI** — Generates a motivational quote\n3. 🐦 **Post to X** — Publishes it on Twitter/X\n\nI named it **✨ Daily Inspiration Bot**!\n\n⚠️ To post to X, you'll need to connect your Twitter account. Want me to help with that?`,
+    response: `[bird] Here's your social media agent:\n\n1. [clock] **Schedule** — Every morning at 9am\n2. [brain] **Claude AI** — Generates a motivational quote\n3. [bird] **Post to X** — Publishes it on Twitter/X\n\nI named it **[sparkle] Daily Inspiration Bot**!\n\n[warn] To post to X, you'll need to connect your Twitter account. Want me to help with that?`,
     toolCalls,
-    workflowName: '✨ Daily Inspiration Bot',
-    workflowEmoji: '✨',
+    workflowName: '[sparkle] Daily Inspiration Bot',
+    workflowEmoji: '[sparkle]',
     buttons: [
-      { label: '🔑 Connect Twitter', action: 'How do I connect my Twitter account?' },
-      { label: '▶️ Run Test', action: 'Run the workflow to test it' },
+      { label: '[key] Connect Twitter', action: 'How do I connect my Twitter account?' },
+      { label: '[>] Run Test', action: 'Run the workflow to test it' },
     ],
   };
 }
@@ -1159,49 +1159,49 @@ function buildWebMonitorWorkflow(existingNodes: any[]) {
     {
       id: 'tc_1', name: 'add_node',
       input: { type: 'schedule_trigger', config: { schedule: 'every hour' } },
-      result: { nodeId: `node_${now}_1`, type: 'schedule_trigger', label: 'Schedule', emoji: '⏰', config: { schedule: 'every hour' }, position: { x: 300, y: baseY } },
+      result: { nodeId: `node_${now}_1`, type: 'schedule_trigger', label: 'Schedule', emoji: '[clock]', config: { schedule: 'every hour' }, position: { x: 300, y: baseY } },
       status: 'done',
     },
     {
       id: 'tc_2', name: 'add_node',
       input: { type: 'web_scraper', config: { url: 'https://example.com' } },
-      result: { nodeId: `node_${now}_2`, type: 'web_scraper', label: 'Web Scraper', emoji: '🕷️', config: { url: 'https://example.com' }, position: { x: 300, y: baseY + 150 } },
+      result: { nodeId: `node_${now}_2`, type: 'web_scraper', label: 'Web Scraper', emoji: '[spider]', config: { url: 'https://example.com' }, position: { x: 300, y: baseY + 150 } },
       status: 'done',
     },
     {
       id: 'tc_3', name: 'add_node',
       input: { type: 'if_else', config: { condition: 'content has changed since last check' } },
-      result: { nodeId: `node_${now}_3`, type: 'if_else', label: 'If/Else', emoji: '🔀', config: { condition: 'content has changed' }, position: { x: 300, y: baseY + 300 } },
+      result: { nodeId: `node_${now}_3`, type: 'if_else', label: 'If/Else', emoji: '[branch]', config: { condition: 'content has changed' }, position: { x: 300, y: baseY + 300 } },
       status: 'done',
     },
     {
       id: 'tc_4', name: 'add_node',
-      input: { type: 'send_telegram', config: { message: '🚨 Website changed! Check it out.' } },
-      result: { nodeId: `node_${now}_4`, type: 'send_telegram', label: 'Send Telegram', emoji: '✈️', config: { message: '🚨 Website changed!' }, position: { x: 300, y: baseY + 450 } },
+      input: { type: 'send_telegram', config: { message: '[alert] Website changed! Check it out.' } },
+      result: { nodeId: `node_${now}_4`, type: 'send_telegram', label: 'Send Telegram', emoji: '[send]', config: { message: '[alert] Website changed!' }, position: { x: 300, y: baseY + 450 } },
       status: 'done',
     },
   ];
 
   return {
-    response: `🔍 Building your web monitor:\n\n1. ⏰ **Schedule** — Checks every hour\n2. 🕷️ **Web Scraper** — Fetches the page content\n3. 🔀 **If/Else** — Checks if anything changed\n4. ✈️ **Send Telegram** — Alerts you if there's a change\n\nYour **🔍 Web Watchdog** is ready! What URL should I monitor?`,
+    response: `[search] Building your web monitor:\n\n1. [clock] **Schedule** — Checks every hour\n2. [spider] **Web Scraper** — Fetches the page content\n3. [branch] **If/Else** — Checks if anything changed\n4. [send] **Send Telegram** — Alerts you if there's a change\n\nYour **[search] Web Watchdog** is ready! What URL should I monitor?`,
     toolCalls,
-    workflowName: '🔍 Web Watchdog',
-    workflowEmoji: '🔍',
+    workflowName: '[search] Web Watchdog',
+    workflowEmoji: '[search]',
     buttons: [
-      { label: '🔗 Set URL', action: 'Set the URL to monitor to https://example.com/pricing' },
-      { label: '▶️ Run Test', action: 'Run a test of the web monitor' },
+      { label: '[link] Set URL', action: 'Set the URL to monitor to https://example.com/pricing' },
+      { label: '[>] Run Test', action: 'Run a test of the web monitor' },
     ],
   };
 }
 
 function simulateRun(nodes: any[]) {
   return {
-    response: `▶️ **Running your workflow!**\n\nWatch the canvas — you'll see each node light up as it executes. Check the **Inspector** panel on the right to see the live timeline, API calls, and data flowing between nodes.\n\n${nodes.length === 0 ? "⚠️ Hmm, the canvas is empty! Tell me what you'd like to build first." : "🎬 Execution started! Each node will turn green as it completes."}`,
+    response: `[>] **Running your workflow!**\n\nWatch the canvas — you'll see each node light up as it executes. Check the **Inspector** panel on the right to see the live timeline, API calls, and data flowing between nodes.\n\n${nodes.length === 0 ? "[warn] Hmm, the canvas is empty! Tell me what you'd like to build first." : "[video] Execution started! Each node will turn green as it completes."}`,
     toolCalls: nodes.length > 0 ? [{ id: 'tc_run', name: 'run_workflow', input: { test_mode: true }, result: { success: true }, status: 'done' }] : [],
     buttons: nodes.length > 0 ? [
-      { label: '📊 View Results', action: 'Show me the results of the workflow run' },
+      { label: '[chart] View Results', action: 'Show me the results of the workflow run' },
     ] : [
-      { label: '😂 Daily joke by email', action: 'Send me a daily joke by email every morning at 8am' },
+      { label: '[joke] Daily joke by email', action: 'Send me a daily joke by email every morning at 8am' },
     ],
   };
 }
@@ -1223,43 +1223,43 @@ function buildScriptToVideoWorkflow(existingNodes: any[]) {
     {
       id: 'tc_1', name: 'add_node',
       input: { type: 'script_parser', config: { format: 'auto' } },
-      result: { nodeId: `node_${now}_1`, type: 'script_parser', label: 'Script Parser', emoji: '📜', config: { format: 'auto' }, position: { x: 300, y: baseY } },
+      result: { nodeId: `node_${now}_1`, type: 'script_parser', label: 'Script Parser', emoji: '[scroll]', config: { format: 'auto' }, position: { x: 300, y: baseY } },
       status: 'done',
     },
     {
       id: 'tc_2', name: 'add_node',
       input: { type: 'element_reference', config: { model: 'flux-pro' } },
-      result: { nodeId: `node_${now}_2`, type: 'element_reference', label: 'Element Reference', emoji: '🎭', config: { model: 'flux-pro' }, position: { x: 300, y: baseY + 150 } },
+      result: { nodeId: `node_${now}_2`, type: 'element_reference', label: 'Element Reference', emoji: '[masks]', config: { model: 'flux-pro' }, position: { x: 300, y: baseY + 150 } },
       status: 'done',
     },
     {
       id: 'tc_3', name: 'add_node',
       input: { type: 'photo_generator', config: { model: 'flux-pro', width: 1920, height: 1080 } },
-      result: { nodeId: `node_${now}_3`, type: 'photo_generator', label: 'Photo Generator', emoji: '📸', config: { model: 'flux-pro', width: 1920, height: 1080 }, position: { x: 300, y: baseY + 300 } },
+      result: { nodeId: `node_${now}_3`, type: 'photo_generator', label: 'Photo Generator', emoji: '[photo]', config: { model: 'flux-pro', width: 1920, height: 1080 }, position: { x: 300, y: baseY + 300 } },
       status: 'done',
     },
     {
       id: 'tc_4', name: 'add_node',
       input: { type: 'video_generator', config: { model: 'kling', duration: 4 } },
-      result: { nodeId: `node_${now}_4`, type: 'video_generator', label: 'Video Generator', emoji: '🎬', config: { model: 'kling', duration: 4 }, position: { x: 300, y: baseY + 450 } },
+      result: { nodeId: `node_${now}_4`, type: 'video_generator', label: 'Video Generator', emoji: '[video]', config: { model: 'kling', duration: 4 }, position: { x: 300, y: baseY + 450 } },
       status: 'done',
     },
     {
       id: 'tc_5', name: 'add_node',
       input: { type: 'voiceover_generator', config: { model: 'elevenlabs', voice: 'adam' } },
-      result: { nodeId: `node_${now}_5`, type: 'voiceover_generator', label: 'Voiceover Generator', emoji: '🗣️', config: { model: 'elevenlabs', voice: 'adam' }, position: { x: 300, y: baseY + 600 } },
+      result: { nodeId: `node_${now}_5`, type: 'voiceover_generator', label: 'Voiceover Generator', emoji: '[voice]', config: { model: 'elevenlabs', voice: 'adam' }, position: { x: 300, y: baseY + 600 } },
       status: 'done',
     },
     {
       id: 'tc_6', name: 'add_node',
       input: { type: 'project_orchestrator', config: { projectName: 'My Video Project', photoModel: 'flux-pro', videoModel: 'kling', voiceModel: 'elevenlabs' } },
-      result: { nodeId: `node_${now}_6`, type: 'project_orchestrator', label: 'Project Orchestrator', emoji: '🎯', config: { projectName: 'My Video Project', photoModel: 'flux-pro', videoModel: 'kling', voiceModel: 'elevenlabs' }, position: { x: 300, y: baseY + 750 } },
+      result: { nodeId: `node_${now}_6`, type: 'project_orchestrator', label: 'Project Orchestrator', emoji: '[target]', config: { projectName: 'My Video Project', photoModel: 'flux-pro', videoModel: 'kling', voiceModel: 'elevenlabs' }, position: { x: 300, y: baseY + 750 } },
       status: 'done',
     },
     {
       id: 'tc_6b', name: 'add_node',
       input: { type: 'final_video_compiler', config: { transition: 'fade', outputResolution: '1920x1080', outputFormat: 'mp4', addCaptions: 'no', mode: 'cloudinary' } },
-      result: { nodeId: `node_${now}_7`, type: 'final_video_compiler', label: 'Final Video Compiler', emoji: '🎞️', config: { transition: 'fade', outputResolution: '1920x1080', outputFormat: 'mp4', addCaptions: 'no', mode: 'cloudinary' }, position: { x: 300, y: baseY + 900 } },
+      result: { nodeId: `node_${now}_7`, type: 'final_video_compiler', label: 'Final Video Compiler', emoji: '[film]', config: { transition: 'fade', outputResolution: '1920x1080', outputFormat: 'mp4', addCaptions: 'no', mode: 'cloudinary' }, position: { x: 300, y: baseY + 900 } },
       status: 'done',
     },
     // Connect all nodes
@@ -1272,15 +1272,15 @@ function buildScriptToVideoWorkflow(existingNodes: any[]) {
   ];
 
   return {
-    response: `🎬 **Building your Script-to-Video Pipeline!**\n\nHere's what I've set up:\n\n1. 📜 **Script Parser** — Parses your script into scenes & shots, detects @Element tags\n2. 🎭 **Element Reference** — Generates consistent character/location reference images via fal.ai\n3. 📸 **Photo Generator** — Creates a still photo for each shot (Flux Pro)\n4. 🎬 **Video Generator** — Turns each photo into a video clip (Kling)\n5. 🗣️ **Voiceover Generator** — Generates narration audio (ElevenLabs)\n6. 🎯 **Project Orchestrator** — Runs everything in order, saves to Cloudinary\n7. 🎞️ **Final Video Compiler** — Merges all shots into one video with fade transitions, syncs voiceovers, and uploads the final MP4\n\nAll assets will be organized in Cloudinary folders by scene/shot. The compiler uses Cloudinary's splice API for fast, free merging — or can switch to FFmpeg for advanced edits.\n\n**To get started:**\n- Paste your script into the Script Parser node\n- Or upload a .txt file\n- The orchestrator + compiler will handle everything else!\n\n**Estimated cost:** Depends on shot count (~$0.50/shot for photo+video+voice, compilation is free via Cloudinary)\n\n⚠️ You'll need **fal.ai** and **Cloudinary** API keys configured. Want me to help with that?`,
+    response: `[video] **Building your Script-to-Video Pipeline!**\n\nHere's what I've set up:\n\n1. [scroll] **Script Parser** — Parses your script into scenes & shots, detects @Element tags\n2. [masks] **Element Reference** — Generates consistent character/location reference images via fal.ai\n3. [photo] **Photo Generator** — Creates a still photo for each shot (Flux Pro)\n4. [video] **Video Generator** — Turns each photo into a video clip (Kling)\n5. [voice] **Voiceover Generator** — Generates narration audio (ElevenLabs)\n6. [target] **Project Orchestrator** — Runs everything in order, saves to Cloudinary\n7. [film] **Final Video Compiler** — Merges all shots into one video with fade transitions, syncs voiceovers, and uploads the final MP4\n\nAll assets will be organized in Cloudinary folders by scene/shot. The compiler uses Cloudinary's splice API for fast, free merging — or can switch to FFmpeg for advanced edits.\n\n**To get started:**\n- Paste your script into the Script Parser node\n- Or upload a .txt file\n- The orchestrator + compiler will handle everything else!\n\n**Estimated cost:** Depends on shot count (~$0.50/shot for photo+video+voice, compilation is free via Cloudinary)\n\n[warn] You'll need **fal.ai** and **Cloudinary** API keys configured. Want me to help with that?`,
     toolCalls,
     taskList,
-    workflowName: '🎬 Script to Video Pipeline',
-    workflowEmoji: '🎬',
+    workflowName: '[video] Script to Video Pipeline',
+    workflowEmoji: '[video]',
     buttons: [
       { label: '📋 Paste Script', action: 'I want to paste my script now' },
-      { label: '🔑 Add Credentials', action: 'How do I add my fal.ai and Cloudinary API keys?' },
-      { label: '⚙️ Change Models', action: 'What other models can I use for photo/video/voice generation?' },
+      { label: '[key] Add Credentials', action: 'How do I add my fal.ai and Cloudinary API keys?' },
+      { label: '[gear] Change Models', action: 'What other models can I use for photo/video/voice generation?' },
     ],
   };
 }
@@ -1291,21 +1291,21 @@ function buildGenericWorkflow(message: string, existingNodes: any[]) {
     {
       id: 'tc_1', name: 'add_node',
       input: { type: 'manual_trigger', config: {} },
-      result: { nodeId: `node_${now}_1`, type: 'manual_trigger', label: 'Manual Trigger', emoji: '👆', config: {}, position: { x: 300, y: 80 } },
+      result: { nodeId: `node_${now}_1`, type: 'manual_trigger', label: 'Manual Trigger', emoji: '[click]', config: {}, position: { x: 300, y: 80 } },
       status: 'done',
     },
     {
       id: 'tc_2', name: 'add_node',
       input: { type: 'claude_chat', config: { prompt: message } },
-      result: { nodeId: `node_${now}_2`, type: 'claude_chat', label: 'Claude AI', emoji: '🧠', config: { prompt: message }, position: { x: 300, y: 230 } },
+      result: { nodeId: `node_${now}_2`, type: 'claude_chat', label: 'Claude AI', emoji: '[brain]', config: { prompt: message }, position: { x: 300, y: 230 } },
       status: 'done',
     },
   ];
 
   return {
-    response: `I've started building your workflow! 🚀\n\n1. 👆 **Manual Trigger** — You'll click to start it\n2. 🧠 **Claude AI** — Will process your request\n\nThis is a starting point. Tell me more about what you want this agent to do, and I'll add more steps!\n\nFor example:\n- Where should the result go? (email, Twitter, file, etc.)\n- Should it run on a schedule or manually?\n- Do you need any data from the web?`,
+    response: `I've started building your workflow! [rocket]\n\n1. [click] **Manual Trigger** — You'll click to start it\n2. [brain] **Claude AI** — Will process your request\n\nThis is a starting point. Tell me more about what you want this agent to do, and I'll add more steps!\n\nFor example:\n- Where should the result go? (email, Twitter, file, etc.)\n- Should it run on a schedule or manually?\n- Do you need any data from the web?`,
     toolCalls,
-    workflowName: '🤖 My Agent',
-    workflowEmoji: '🤖',
+    workflowName: '[bot] My Agent',
+    workflowEmoji: '[bot]',
   };
 }

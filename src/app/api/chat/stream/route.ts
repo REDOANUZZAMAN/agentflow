@@ -509,7 +509,7 @@ export async function POST(req: NextRequest) {
         if (!allText && allToolCalls.length > 0) {
           const nodeCount = allToolCalls.filter(t => t.name === 'add_node').length;
           const edgeCount = allToolCalls.filter(t => t.name === 'connect_nodes').length;
-          allText = `✨ Built your workflow! ${nodeCount} nodes created, ${edgeCount} connections made. Ready to run!`;
+          allText = `[sparkle] Built your workflow! ${nodeCount} nodes created, ${edgeCount} connections made. Ready to run!`;
           send('text', { content: allText });
         }
 

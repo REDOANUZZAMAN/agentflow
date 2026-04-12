@@ -21,6 +21,7 @@ export const FAL_PRICING: Record<string, number> = {
   'fal-ai/kling-video/v2.5-turbo/standard/image-to-video': 0.050,
 
   // Audio — price per generation
+  'fal-ai/elevenlabs/tts/turbo-v2.5':               0.030,
   'fal-ai/elevenlabs/text-to-dialogue/eleven-v3':   0.050,
   'fal-ai/elevenlabs/music':                        0.100,  // per ~30s
 
@@ -101,7 +102,7 @@ export function estimateWorkflowCost(nodes: Array<{ data: { type: string; config
       existing.count++;
       typeCount.set(key, existing);
     } else if (['voiceover_generator', 'voice_gen'].includes(t)) {
-      const model = config.model || 'fal-ai/elevenlabs/text-to-dialogue/eleven-v3';
+      const model = config.model || 'fal-ai/elevenlabs/tts/turbo-v2.5';
       const key = `audio:${model}`;
       const existing = typeCount.get(key) || { count: 0, model };
       existing.count++;

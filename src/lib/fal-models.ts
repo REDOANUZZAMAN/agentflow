@@ -16,7 +16,7 @@ export const FAL_MODELS = {
   VIDEO_KLING_O3_R2V: 'fal-ai/kling-video/o3/pro/reference-to-video',
 
   // ─── Audio ─────────────────────────────────────────────────────
-  VOICE_TTS: 'fal-ai/elevenlabs/tts',
+  VOICE_TTS: 'fal-ai/elevenlabs/tts/turbo-v2.5',
   VOICE_DIALOGUE: 'fal-ai/elevenlabs/text-to-dialogue/eleven-v3',
   MUSIC: 'fal-ai/elevenlabs/music',
 } as const;

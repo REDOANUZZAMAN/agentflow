@@ -103,7 +103,8 @@ Video:
 - fal-ai/kling-video/o3/pro/reference-to-video → Multi-character consistency. $1.20.
 
 Audio:
-- fal-ai/elevenlabs/text-to-dialogue/eleven-v3 → Voiceover/narration. $0.05.
+- fal-ai/elevenlabs/tts/turbo-v2.5 → Default voiceover/narration. Fast, low latency, 32 languages. $0.03.
+- fal-ai/elevenlabs/text-to-dialogue/eleven-v3 → Multi-speaker dialogue. $0.05.
 - fal-ai/elevenlabs/music → Background music/soundtrack. $0.10.
 
 ## Model Selection Rules

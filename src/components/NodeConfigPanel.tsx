@@ -396,7 +396,8 @@ function getConfigFields(type: NodeType | string): FieldDef[] {
           { value: 'Diana', label: 'Diana (female)' },
         ]},
         { key: 'model', label: 'TTS Model', type: 'select', options: [
-          { value: 'fal-ai/elevenlabs/text-to-dialogue/eleven-v3', label: '🗣️ ElevenLabs v3 Dialogue ($0.05)' },
+          { value: 'fal-ai/elevenlabs/tts/turbo-v2.5', label: '🗣️ ElevenLabs Turbo v2.5 ($0.03)' },
+          { value: 'fal-ai/elevenlabs/text-to-dialogue/eleven-v3', label: '🎭 ElevenLabs v3 Dialogue ($0.05)' },
         ]},
       ];
     case 'music_generator':
@@ -419,7 +420,8 @@ function getConfigFields(type: NodeType | string): FieldDef[] {
           { value: 'fal-ai/kling-video/o3/pro/text-to-video', label: '📝 Kling O3 Text' },
         ]},
         { key: 'voiceModel', label: 'Default Voice Model', type: 'select', options: [
-          { value: 'fal-ai/elevenlabs/text-to-dialogue/eleven-v3', label: '🗣️ ElevenLabs v3' },
+          { value: 'fal-ai/elevenlabs/tts/turbo-v2.5', label: '🗣️ ElevenLabs Turbo v2.5' },
+          { value: 'fal-ai/elevenlabs/text-to-dialogue/eleven-v3', label: '🎭 ElevenLabs v3 Dialogue' },
         ]},
         { key: 'cloudinaryFolder', label: 'Cloudinary Folder', type: 'text', placeholder: 'projects/{projectId}' },
       ];

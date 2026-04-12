@@ -68,7 +68,7 @@ export const NODE_SCHEMAS: Record<string, NodeSchema> = {
     defaults: {
       text: '',
       voice: 'Rachel',
-      model: 'fal-ai/elevenlabs/text-to-dialogue/eleven-v3',
+      model: 'fal-ai/elevenlabs/tts/turbo-v2.5',
     },
   },
   music_generator: {
@@ -85,7 +85,7 @@ export const NODE_SCHEMAS: Record<string, NodeSchema> = {
       projectName: 'Video Project',
       photoModel: 'fal-ai/nano-banana-2',
       videoModel: 'fal-ai/kling-video/o3/pro/image-to-video',
-      voiceModel: 'fal-ai/elevenlabs/text-to-dialogue/eleven-v3',
+      voiceModel: 'fal-ai/elevenlabs/tts/turbo-v2.5',
       cloudinaryFolder: '',
     },
     runtimeFills: ['cloudinaryFolder'],

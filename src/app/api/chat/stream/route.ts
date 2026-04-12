@@ -167,8 +167,20 @@ export async function POST(req: NextRequest) {
         let taskList: any[] = [];
         let plannedTaskCount = 0;
 
-        // Track created shot nodes for dedup (Bug 1 fix)
+        // Track created shot nodes for dedup — pre-populate from existing canvas nodes
         const shotTracker = new Map<string, string>(); // "type:scene:shot" → nodeId
+        // Pre-load existing canvas nodes into tracker (prevents duplicates across continuation rounds)
+        for (const existingNode of (nodes || [])) {
+          const nd = existingNode.data;
+          if (nd && nd.config) {
+            const sn = nd.config.sceneNumber || nd.config.scene_number;
+            const sh = nd.config.shotNumber || nd.config.shot_number;
+            if (sn && sh) {
+              const key = `${nd.type}:${sn}:${sh}`;
+              shotTracker.set(key, existingNode.id);
+            }
+          }
+        }
 
         // Smart grid position calculator (Bug 2 fix)
         const COL_W = 280;
@@ -217,9 +229,25 @@ export async function POST(req: NextRequest) {
               const t = inp.type as NodeType;
               const config = (inp.config || {}) as Record<string, any>;
 
-              // Bug 1 fix: Reject duplicate shot nodes
+              // HARD BACKEND VALIDATION for shot-type nodes
               const shotTypes = ['photo_generator', 'video_generator', 'voiceover_generator', 'video_gen', 'voice_gen'];
-              if (shotTypes.includes(t) && config.shotNumber && config.sceneNumber) {
+              if (shotTypes.includes(t)) {
+                const sn = config.sceneNumber || config.scene_number;
+                const sh = config.shotNumber || config.shot_number;
+
+                // REJECT if scene/shot numbers are missing
+                if (!sn || !sh) {
+                  result = { error: `REJECTED: ${t} MUST include sceneNumber and shotNumber in config. Got: scene=${sn}, shot=${sh}. Fix your add_node call.`, rejected: true };
+                  const processed = { id: block.id, name: block.name, input: inp, result, status: 'error' };
+                  allToolCalls.push(processed);
+                  return processed;
+                }
+
+                // Normalize to camelCase
+                config.sceneNumber = Number(sn);
+                config.shotNumber = Number(sh);
+
+                // REJECT duplicates
                 const key = `${t}:${config.sceneNumber}:${config.shotNumber}`;
                 if (shotTracker.has(key)) {
                   result = { error: `DUPLICATE REJECTED: ${t} for scene ${config.sceneNumber} shot ${config.shotNumber} already exists (${shotTracker.get(key)}). Skipped.`, duplicate: true };

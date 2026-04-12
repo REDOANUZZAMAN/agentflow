@@ -55,7 +55,7 @@ function initCloudinary() {
   return cloudinary;
 }
 
-// Upload to Cloudinary
+// Upload to Cloudinary — NEVER overwrite, always unique IDs
 async function uploadToCloudinary(
   url: string,
   folder: string,
@@ -63,11 +63,13 @@ async function uploadToCloudinary(
   resourceType: 'image' | 'video' | 'raw' = 'image'
 ): Promise<{ secure_url: string; public_id: string; width?: number; height?: number; bytes?: number; duration?: number }> {
   const cld = initCloudinary();
+  // Append timestamp suffix to guarantee uniqueness even if caller sends same publicId
+  const uniqueId = `${publicId}_${Date.now()}`;
   const result = await cld.uploader.upload(url, {
     folder,
-    public_id: publicId,
+    public_id: uniqueId,
     resource_type: resourceType,
-    overwrite: true,
+    overwrite: false,  // CRITICAL: refuse to overwrite existing files
   });
   return {
     secure_url: result.secure_url,
@@ -149,13 +151,19 @@ async function executeElementReference(node: WorkflowNode, ctx: ExecutionContext
 
 async function executePhotoGenerator(node: WorkflowNode, ctx: ExecutionContext) {
   initFal();
-  const { prompt, negative_prompt, model, scene_number, shot_number, width, height } = node.data.config;
+  const { prompt, negative_prompt, model, scene_number, shot_number, sceneNumber, shotNumber } = node.data.config;
   const elementRefs = getUpstream(ctx, node.id, 'element_reference');
   const hasRefs = elementRefs.length > 0;
   const falModel = model || pickImageModel(hasRefs, elementRefs.length, false);
-  const sceneNum = scene_number || 1;
-  const shotNum = shot_number || 1;
-  let finalPrompt = prompt || 'A beautiful scene';
+  // Accept both snake_case and camelCase config keys
+  const sceneNum = scene_number || sceneNumber || 1;
+  const shotNum = shot_number || shotNumber || 1;
+  const finalPrompt = prompt || 'A beautiful scene';
+
+  // Fix 4: Validate prompt
+  if (!finalPrompt || finalPrompt.trim().length < 3) {
+    throw new Error(`Photo prompt is empty or too short: "${finalPrompt}". Provide a descriptive prompt.`);
+  }
   
   ctx.emit({ type: 'log', nodeId: node.id, data: { message: `📸 Generating photo for Scene ${sceneNum}, Shot ${shotNum}...` } });
   ctx.emit({ type: 'api_call', nodeId: node.id, data: { service: 'fal.ai', model: falModel, prompt: finalPrompt } });
@@ -168,16 +176,28 @@ async function executePhotoGenerator(node: WorkflowNode, ctx: ExecutionContext) 
   };
   if (negative_prompt) input.negative_prompt = negative_prompt;
 
-  const result = await fal.subscribe(falModel, { input });
+  // Fix 4: Log full request body on error
+  let result: any;
+  try {
+    result = await fal.subscribe(falModel, { input });
+  } catch (err: any) {
+    ctx.emit({ type: 'log', nodeId: node.id, data: { 
+      message: `❌ fal.ai photo request FAILED. Model: ${falModel}, Input: ${JSON.stringify(input, null, 2)}`,
+      error: err.message,
+      body: err.body || err.response || null,
+    }});
+    throw new Error(`fal.ai photo generation failed (${falModel}): ${err.message}`);
+  }
 
   const imageUrl = (result as any).data?.images?.[0]?.url || (result as any).images?.[0]?.url;
   if (!imageUrl) throw new Error('No photo URL returned from fal.ai');
 
-  ctx.emit({ type: 'log', nodeId: node.id, data: { message: `📤 Uploading photo to Cloudinary...` } });
+  ctx.emit({ type: 'log', nodeId: node.id, data: { message: `📤 Uploading photo to Cloudinary (scene-${sceneNum}/shot-${shotNum})...` } });
 
+  // Fix 1: Unique path per scene/shot/execution
   const cldResult = await uploadToCloudinary(
     imageUrl,
-    `agentflow/${ctx.projectId}/scene-${sceneNum}/shot-${shotNum}`,
+    `agentflow/${ctx.executionId}/scene-${sceneNum}/shot-${shotNum}`,
     'photo',
     'image'
   );
@@ -196,30 +216,58 @@ async function executePhotoGenerator(node: WorkflowNode, ctx: ExecutionContext) 
   };
 }
 
+// Fix 3: Find photo by matching scene+shot across all completed outputs
+function findPhotoBySceneShot(ctx: ExecutionContext, sceneNum: number, shotNum: number): string | null {
+  for (const [, output] of ctx.nodeOutputs) {
+    if (output._nodeType === 'photo_generator' && output.photoUrl &&
+        output.sceneNumber === sceneNum && output.shotNumber === shotNum) {
+      return output.photoUrl;
+    }
+  }
+  // Also check element references as fallback
+  for (const [, output] of ctx.nodeOutputs) {
+    if (output._nodeType === 'element_reference' && output.imageUrl) {
+      return output.imageUrl;
+    }
+  }
+  return null;
+}
+
 async function executeVideoGenerator(node: WorkflowNode, ctx: ExecutionContext) {
   initFal();
-  const { prompt, negative_prompt, duration, model, scene_number, shot_number } = node.data.config;
-  const upstreamPhotos2 = getUpstream(ctx, node.id, 'photo_generator');
-  const upstreamRefs = getUpstream(ctx, node.id, 'element_reference');
-  const falModel = model || pickVideoModel(upstreamPhotos2.length > 0, upstreamRefs.length > 0);
-  const sceneNum = scene_number || 1;
-  const shotNum = shot_number || 1;
+  const { prompt, negative_prompt, duration, model, scene_number, shot_number, sceneNumber, shotNumber } = node.data.config;
+  // Accept both snake_case and camelCase
+  const sceneNum = scene_number || sceneNumber || 1;
+  const shotNum = shot_number || shotNumber || 1;
   const videoDuration = duration || 5;
 
-  // Get photo from upstream
+  // Fix 3: Smart photo lookup — first try edges, then scene/shot match
   const upstreamPhotos = getUpstream(ctx, node.id, 'photo_generator');
-  const photoUrl = upstreamPhotos[0]?.photoUrl;
-  
-  if (!photoUrl) {
-    // Try any upstream with an image URL
+  const upstreamRefs = getUpstream(ctx, node.id, 'element_reference');
+  let sourceImageUrl = upstreamPhotos[0]?.photoUrl;
+
+  if (!sourceImageUrl) {
+    // Try any upstream with a photo URL
     const anyUpstream = getUpstream(ctx, node.id);
-    const fallbackUrl = anyUpstream.find(u => u.photoUrl || u.imageUrl);
-    if (!fallbackUrl) throw new Error('Video node needs an upstream photo — no image URL found');
+    sourceImageUrl = anyUpstream.find(u => u.photoUrl)?.photoUrl || anyUpstream.find(u => u.imageUrl)?.imageUrl;
   }
 
-  const sourceImageUrl = photoUrl || getUpstream(ctx, node.id).find(u => u.photoUrl || u.imageUrl)?.photoUrl || getUpstream(ctx, node.id).find(u => u.imageUrl)?.imageUrl;
+  if (!sourceImageUrl) {
+    // Fix 3: Fallback — find by matching scene+shot in ALL completed outputs
+    ctx.emit({ type: 'log', nodeId: node.id, data: { message: `⚠️ No upstream photo via edges — searching by scene ${sceneNum}, shot ${shotNum}...` } });
+    sourceImageUrl = findPhotoBySceneShot(ctx, sceneNum, shotNum);
+    if (sourceImageUrl) {
+      ctx.emit({ type: 'log', nodeId: node.id, data: { message: `✅ Found matching photo by scene/shot lookup` } });
+    }
+  }
 
-  ctx.emit({ type: 'log', nodeId: node.id, data: { message: `🎬 Generating ${videoDuration}s video via ${falModel}...` } });
+  if (!sourceImageUrl) {
+    throw new Error(`Video for scene ${sceneNum} shot ${shotNum}: no photo found. Check that a photo_generator with matching sceneNumber/shotNumber exists and is connected.`);
+  }
+
+  const falModel = model || pickVideoModel(!!sourceImageUrl, upstreamRefs.length > 0);
+
+  ctx.emit({ type: 'log', nodeId: node.id, data: { message: `🎬 Generating ${videoDuration}s video for Scene ${sceneNum}, Shot ${shotNum} via ${falModel}...` } });
   ctx.emit({ type: 'api_call', nodeId: node.id, data: { service: 'fal.ai', model: falModel, duration: videoDuration } });
 
   const input: any = {
@@ -230,16 +278,27 @@ async function executeVideoGenerator(node: WorkflowNode, ctx: ExecutionContext) 
   };
   if (negative_prompt) input.negative_prompt = negative_prompt;
 
-  const result = await fal.subscribe(falModel, { input });
+  // Fix 4: Log full request body on error
+  let result: any;
+  try {
+    result = await fal.subscribe(falModel, { input });
+  } catch (err: any) {
+    ctx.emit({ type: 'log', nodeId: node.id, data: {
+      message: `❌ fal.ai video request FAILED. Model: ${falModel}, Input: ${JSON.stringify(input, null, 2)}`,
+      error: err.message,
+    }});
+    throw new Error(`fal.ai video generation failed (${falModel}): ${err.message}`);
+  }
 
   const videoUrl = (result as any).data?.video?.url || (result as any).video?.url;
   if (!videoUrl) throw new Error('No video URL returned from fal.ai');
 
-  ctx.emit({ type: 'log', nodeId: node.id, data: { message: `📤 Uploading video to Cloudinary...` } });
+  ctx.emit({ type: 'log', nodeId: node.id, data: { message: `📤 Uploading video to Cloudinary (scene-${sceneNum}/shot-${shotNum})...` } });
 
+  // Fix 1: Unique path per execution
   const cldResult = await uploadToCloudinary(
     videoUrl,
-    `agentflow/${ctx.projectId}/scene-${sceneNum}/shot-${shotNum}`,
+    `agentflow/${ctx.executionId}/scene-${sceneNum}/shot-${shotNum}`,
     'video',
     'video'
   );

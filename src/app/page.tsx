@@ -27,6 +27,48 @@ function useInView(threshold = 0.15) {
   return { ref, visible };
 }
 
+/* ───────── live demo timeline hook ───────── */
+function useLiveDemo(startVisible: boolean) {
+  const [stage, setStage] = useState(0);
+  const [typedText, setTypedText] = useState('');
+  const fullText = 'Send me a daily joke by email every morning';
+  
+  useEffect(() => {
+    if (!startVisible) return;
+    // Stage 0: start typing (after 400ms)
+    const t0 = setTimeout(() => setStage(1), 400);
+    return () => clearTimeout(t0);
+  }, [startVisible]);
+  
+  // Typewriter effect
+  useEffect(() => {
+    if (stage < 1) return;
+    let i = 0;
+    const id = setInterval(() => {
+      i++;
+      setTypedText(fullText.slice(0, i));
+      if (i >= fullText.length) {
+        clearInterval(id);
+        setTimeout(() => setStage(2), 600);  // AI starts responding
+      }
+    }, 35);
+    return () => clearInterval(id);
+  }, [stage]);
+  
+  // Progress through demo stages
+  useEffect(() => {
+    if (stage === 2) { const t = setTimeout(() => setStage(3), 800); return () => clearTimeout(t); }  // show node 1
+    if (stage === 3) { const t = setTimeout(() => setStage(4), 700); return () => clearTimeout(t); }  // show connection 1
+    if (stage === 4) { const t = setTimeout(() => setStage(5), 600); return () => clearTimeout(t); }  // show node 2
+    if (stage === 5) { const t = setTimeout(() => setStage(6), 700); return () => clearTimeout(t); }  // show connection 2
+    if (stage === 6) { const t = setTimeout(() => setStage(7), 600); return () => clearTimeout(t); }  // show node 3
+    if (stage === 7) { const t = setTimeout(() => setStage(8), 800); return () => clearTimeout(t); }  // show inspector
+    if (stage === 8) { const t = setTimeout(() => setStage(9), 600); return () => clearTimeout(t); }  // show buttons
+  }, [stage]);
+  
+  return { stage, typedText };
+}
+
 /* ───────── animated counter ───────── */
 function Counter({ target, suffix = '' }: { target: number; suffix?: string }) {
   const [count, setCount] = useState(0);
@@ -102,6 +144,7 @@ export default function LandingPage() {
   const statsSection = useInView(0.1);
   const ctaSection = useInView(0.1);
 
+  const demo = useLiveDemo(previewSection.visible);
   useEffect(() => { setMounted(true); }, []);
 
   return (
@@ -114,8 +157,12 @@ export default function LandingPage() {
       </div>
 
       {/* ─── Matte grain overlay ─── */}
-      <div className="fixed inset-0 pointer-events-none z-[1] opacity-[0.015]"
-        style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`, backgroundSize: '128px 128px' }}
+      <div className="fixed inset-0 pointer-events-none z-[1] opacity-[0.07] mix-blend-overlay"
+        style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`, backgroundSize: '256px 256px' }}
+      />
+      {/* ─── Secondary fine grain ─── */}
+      <div className="fixed inset-0 pointer-events-none z-[1] opacity-[0.04]"
+        style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n2'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.2' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n2)'/%3E%3C/svg%3E")`, backgroundSize: '128px 128px' }}
       />
 
       {/* ─── Nav ─── */}
@@ -217,7 +264,7 @@ export default function LandingPage() {
               <span className="text-[11px] text-white/20 ml-1 tracking-wider uppercase font-medium">AgentFlow Builder</span>
             </div>
             
-            {/* 3-panel layout */}
+            {/* 3-panel layout — LIVE DEMO */}
             <div className="flex h-[400px]">
               {/* Chat panel */}
               <div className="w-[300px] border-r border-white/[0.04] p-5 flex flex-col">
@@ -225,79 +272,125 @@ export default function LandingPage() {
                   <MessageSquare className="w-3 h-3" /> Chat
                 </div>
                 <div className="space-y-3 flex-1">
-                  <div className={`bg-purple-500/[0.08] border border-purple-500/10 rounded-xl p-3 text-xs text-purple-200/80 leading-relaxed transition-all duration-700 delay-300 ${previewSection.visible ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-4'}`}>
-                    Send me a daily joke by email every morning
-                  </div>
-                  <div className={`bg-white/[0.03] border border-white/[0.04] rounded-xl p-3 text-xs text-white/40 leading-relaxed transition-all duration-700 delay-500 ${previewSection.visible ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-4'}`}>
-                    I&apos;ll build that for you! Creating a Schedule trigger for 8am, connecting it to Claude AI for the joke, then sending via Email...
-                  </div>
-                  <div className={`flex gap-2 mt-3 transition-all duration-700 delay-700 ${previewSection.visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'}`}>
-                    <span className="px-3 py-1.5 rounded-lg text-[10px] font-medium bg-emerald-500/[0.08] border border-emerald-500/10 text-emerald-400/80 cursor-pointer hover:bg-emerald-500/[0.12] transition-colors duration-300">Run Workflow</span>
-                    <span className="px-3 py-1.5 rounded-lg text-[10px] font-medium bg-purple-500/[0.08] border border-purple-500/10 text-purple-400/80 cursor-pointer hover:bg-purple-500/[0.12] transition-colors duration-300">Edit Node</span>
-                  </div>
+                  {/* User message — typewriter */}
+                  {demo.stage >= 1 && (
+                    <div className="bg-purple-500/[0.08] border border-purple-500/10 rounded-xl p-3 text-xs text-purple-200/80 leading-relaxed animate-[fadeSlideIn_0.3s_ease]">
+                      {demo.typedText}
+                      {demo.stage === 1 && <span className="inline-block w-[2px] h-3 bg-purple-400/60 ml-0.5 animate-[blink_0.8s_infinite]" />}
+                    </div>
+                  )}
+                  {/* AI response */}
+                  {demo.stage >= 2 && (
+                    <div className="bg-white/[0.03] border border-white/[0.04] rounded-xl p-3 text-xs text-white/40 leading-relaxed animate-[fadeSlideIn_0.4s_ease]">
+                      {demo.stage >= 2 && <span>I&apos;ll build that for you! </span>}
+                      {demo.stage >= 3 && <span className="text-purple-300/60">Creating a Schedule trigger for 8am... </span>}
+                      {demo.stage >= 5 && <span className="text-pink-300/60">connecting it to Claude AI for the joke... </span>}
+                      {demo.stage >= 7 && <span className="text-emerald-300/60">then sending via Email!</span>}
+                      {demo.stage < 7 && <span className="inline-block w-1.5 h-1.5 bg-white/30 rounded-full ml-1 animate-[pulse_1s_infinite]" />}
+                    </div>
+                  )}
+                  {/* Action buttons */}
+                  {demo.stage >= 9 && (
+                    <div className="flex gap-2 mt-3 animate-[fadeSlideIn_0.4s_ease]">
+                      <span className="px-3 py-1.5 rounded-lg text-[10px] font-medium bg-emerald-500/[0.08] border border-emerald-500/10 text-emerald-400/80 cursor-pointer hover:bg-emerald-500/[0.15] transition-colors duration-300">Run Workflow</span>
+                      <span className="px-3 py-1.5 rounded-lg text-[10px] font-medium bg-purple-500/[0.08] border border-purple-500/10 text-purple-400/80 cursor-pointer hover:bg-purple-500/[0.15] transition-colors duration-300">Edit Node</span>
+                    </div>
+                  )}
+                  {/* Empty state */}
+                  {demo.stage === 0 && (
+                    <div className="bg-white/[0.02] border border-white/[0.04] rounded-xl p-3 text-xs text-white/15 flex items-center gap-1.5">
+                      <span className="inline-block w-[2px] h-3 bg-white/20 animate-[blink_0.8s_infinite]" />
+                      Type a message...
+                    </div>
+                  )}
                 </div>
               </div>
               
               {/* Canvas */}
-              <div className="flex-1 relative bg-[var(--color-sunken)]/30 p-6">
+              <div className="flex-1 relative bg-[var(--color-sunken)]/30 p-6 overflow-hidden">
                 <div className="text-[10px] font-semibold text-indigo-400/60 mb-4 flex items-center gap-1.5 tracking-widest uppercase">
                   <Workflow className="w-3 h-3" /> Canvas
                 </div>
                 {/* Dot grid */}
                 <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
                 
-                <div className="flex items-center justify-center h-full gap-6 relative">
-                  {/* Schedule node */}
-                  <div className={`bg-[var(--color-elevated)]/60 backdrop-blur border border-purple-500/15 rounded-2xl p-4 text-center shadow-xl shadow-purple-900/10 transition-all duration-700 delay-400 hover:border-purple-500/30 hover:scale-105 hover:shadow-purple-500/15 ${previewSection.visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
-                    <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center mx-auto mb-2">
-                      <Clock className="w-5 h-5 text-purple-400/80" />
+                {/* Empty canvas state */}
+                {demo.stage < 3 && (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="text-white/10 text-xs tracking-wider">
+                      {demo.stage >= 2 ? (
+                        <span className="flex items-center gap-2 text-purple-400/30">
+                          <span className="inline-block w-2 h-2 rounded-full bg-purple-400/30 animate-[pulse_1s_infinite]" />
+                          Building workflow...
+                        </span>
+                      ) : 'Nodes will appear here'}
                     </div>
-                    <div className="text-[11px] font-semibold text-white/70">Schedule</div>
-                    <div className="text-[9px] text-white/25 mt-0.5">8:00 AM daily</div>
                   </div>
-                  
-                  {/* Connection */}
-                  <svg className={`w-16 h-8 transition-all duration-700 delay-600 ${previewSection.visible ? 'opacity-100' : 'opacity-0'}`} viewBox="0 0 64 32">
-                    <path d="M0 16 L54 16" stroke="url(#grad1)" strokeWidth="1.5" fill="none" strokeDasharray="4 3" className="animate-[dashFlow_2s_linear_infinite]" />
-                    <polygon points="54,12 62,16 54,20" fill="rgba(139,92,246,0.3)" />
-                    <defs>
-                      <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="0%">
-                        <stop offset="0%" stopColor="rgba(168,85,247,0.3)" />
-                        <stop offset="100%" stopColor="rgba(129,140,248,0.3)" />
-                      </linearGradient>
-                    </defs>
-                  </svg>
-                  
-                  {/* Claude node */}
-                  <div className={`bg-[var(--color-elevated)]/60 backdrop-blur border border-pink-500/15 rounded-2xl p-4 text-center shadow-xl shadow-pink-900/10 transition-all duration-700 delay-600 hover:border-pink-500/30 hover:scale-105 hover:shadow-pink-500/15 ${previewSection.visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
-                    <div className="w-10 h-10 rounded-xl bg-pink-500/10 flex items-center justify-center mx-auto mb-2">
-                      <Brain className="w-5 h-5 text-pink-400/80" />
+                )}
+                
+                {/* Nodes appear stage by stage */}
+                {demo.stage >= 3 && (
+                  <div className="flex items-center justify-center h-full gap-4 relative">
+                    {/* Schedule node */}
+                    <div className="bg-[var(--color-elevated)]/60 backdrop-blur border border-purple-500/20 rounded-2xl p-4 text-center shadow-xl shadow-purple-900/10 animate-[nodeAppear_0.5s_cubic-bezier(0.34,1.56,0.64,1)] hover:border-purple-500/30 hover:scale-105 transition-all duration-300">
+                      <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center mx-auto mb-2">
+                        <Clock className="w-5 h-5 text-purple-400/80" />
+                      </div>
+                      <div className="text-[11px] font-semibold text-white/70">Schedule</div>
+                      <div className="text-[9px] text-white/25 mt-0.5">8:00 AM daily</div>
                     </div>
-                    <div className="text-[11px] font-semibold text-white/70">Claude AI</div>
-                    <div className="text-[9px] text-white/25 mt-0.5">Generate joke</div>
+                    
+                    {/* Connection 1 */}
+                    {demo.stage >= 4 && (
+                      <svg className="w-16 h-8 animate-[fadeIn_0.4s_ease]" viewBox="0 0 64 32">
+                        <path d="M0 16 L54 16" stroke="url(#grad1)" strokeWidth="1.5" fill="none" strokeDasharray="4 3" className="animate-[dashFlow_2s_linear_infinite]" />
+                        <polygon points="54,12 62,16 54,20" fill="rgba(139,92,246,0.3)" />
+                        <defs>
+                          <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" stopColor="rgba(168,85,247,0.3)" />
+                            <stop offset="100%" stopColor="rgba(129,140,248,0.3)" />
+                          </linearGradient>
+                        </defs>
+                      </svg>
+                    )}
+                    
+                    {/* Claude node */}
+                    {demo.stage >= 5 && (
+                      <div className="bg-[var(--color-elevated)]/60 backdrop-blur border border-pink-500/20 rounded-2xl p-4 text-center shadow-xl shadow-pink-900/10 animate-[nodeAppear_0.5s_cubic-bezier(0.34,1.56,0.64,1)] hover:border-pink-500/30 hover:scale-105 transition-all duration-300">
+                        <div className="w-10 h-10 rounded-xl bg-pink-500/10 flex items-center justify-center mx-auto mb-2">
+                          <Brain className="w-5 h-5 text-pink-400/80" />
+                        </div>
+                        <div className="text-[11px] font-semibold text-white/70">Claude AI</div>
+                        <div className="text-[9px] text-white/25 mt-0.5">Generate joke</div>
+                      </div>
+                    )}
+                    
+                    {/* Connection 2 */}
+                    {demo.stage >= 6 && (
+                      <svg className="w-16 h-8 animate-[fadeIn_0.4s_ease]" viewBox="0 0 64 32">
+                        <path d="M0 16 L54 16" stroke="url(#grad2)" strokeWidth="1.5" fill="none" strokeDasharray="4 3" className="animate-[dashFlow_2s_linear_infinite]" />
+                        <polygon points="54,12 62,16 54,20" fill="rgba(52,211,153,0.3)" />
+                        <defs>
+                          <linearGradient id="grad2" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" stopColor="rgba(244,114,182,0.3)" />
+                            <stop offset="100%" stopColor="rgba(52,211,153,0.3)" />
+                          </linearGradient>
+                        </defs>
+                      </svg>
+                    )}
+                    
+                    {/* Email node */}
+                    {demo.stage >= 7 && (
+                      <div className="bg-[var(--color-elevated)]/60 backdrop-blur border border-emerald-500/20 rounded-2xl p-4 text-center shadow-xl shadow-emerald-900/10 animate-[nodeAppear_0.5s_cubic-bezier(0.34,1.56,0.64,1)] hover:border-emerald-500/30 hover:scale-105 transition-all duration-300">
+                        <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center mx-auto mb-2">
+                          <Mail className="w-5 h-5 text-emerald-400/80" />
+                        </div>
+                        <div className="text-[11px] font-semibold text-white/70">Send Email</div>
+                        <div className="text-[9px] text-white/25 mt-0.5">To: you@mail.com</div>
+                      </div>
+                    )}
                   </div>
-                  
-                  {/* Connection */}
-                  <svg className={`w-16 h-8 transition-all duration-700 delay-800 ${previewSection.visible ? 'opacity-100' : 'opacity-0'}`} viewBox="0 0 64 32">
-                    <path d="M0 16 L54 16" stroke="url(#grad2)" strokeWidth="1.5" fill="none" strokeDasharray="4 3" className="animate-[dashFlow_2s_linear_infinite]" />
-                    <polygon points="54,12 62,16 54,20" fill="rgba(52,211,153,0.3)" />
-                    <defs>
-                      <linearGradient id="grad2" x1="0%" y1="0%" x2="100%" y2="0%">
-                        <stop offset="0%" stopColor="rgba(244,114,182,0.3)" />
-                        <stop offset="100%" stopColor="rgba(52,211,153,0.3)" />
-                      </linearGradient>
-                    </defs>
-                  </svg>
-                  
-                  {/* Email node */}
-                  <div className={`bg-[var(--color-elevated)]/60 backdrop-blur border border-emerald-500/15 rounded-2xl p-4 text-center shadow-xl shadow-emerald-900/10 transition-all duration-700 delay-800 hover:border-emerald-500/30 hover:scale-105 hover:shadow-emerald-500/15 ${previewSection.visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
-                    <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center mx-auto mb-2">
-                      <Mail className="w-5 h-5 text-emerald-400/80" />
-                    </div>
-                    <div className="text-[11px] font-semibold text-white/70">Send Email</div>
-                    <div className="text-[9px] text-white/25 mt-0.5">To: you@mail.com</div>
-                  </div>
-                </div>
+                )}
               </div>
               
               {/* Inspector */}
@@ -306,22 +399,34 @@ export default function LandingPage() {
                   <Eye className="w-3 h-3" /> Inspector
                 </div>
                 <div className="space-y-2.5">
-                  {[
-                    { status: '200', label: 'Claude API', time: '142ms', delay: 'delay-500' },
-                    { status: '200', label: 'Resend Email', time: '89ms', delay: 'delay-700' },
-                  ].map((item, i) => (
-                    <div key={i} className={`bg-white/[0.02] border border-white/[0.04] rounded-xl p-2.5 transition-all duration-700 ${item.delay} ${previewSection.visible ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-4'}`}>
-                      <div className="flex items-center justify-between">
-                        <span className="text-emerald-400/70 font-mono text-[10px] font-bold">{item.status}</span>
-                        <span className="text-white/15 text-[9px]">{item.time}</span>
+                  {demo.stage >= 8 && (
+                    <>
+                      <div className="bg-white/[0.02] border border-white/[0.04] rounded-xl p-2.5 animate-[fadeSlideIn_0.4s_ease]">
+                        <div className="flex items-center justify-between">
+                          <span className="text-emerald-400/70 font-mono text-[10px] font-bold">200</span>
+                          <span className="text-white/15 text-[9px]">142ms</span>
+                        </div>
+                        <div className="text-white/30 text-[10px] mt-0.5">Claude API</div>
                       </div>
-                      <div className="text-white/30 text-[10px] mt-0.5">{item.label}</div>
+                      <div className="bg-white/[0.02] border border-white/[0.04] rounded-xl p-2.5 animate-[fadeSlideIn_0.4s_ease_0.15s_both]">
+                        <div className="flex items-center justify-between">
+                          <span className="text-emerald-400/70 font-mono text-[10px] font-bold">200</span>
+                          <span className="text-white/15 text-[9px]">89ms</span>
+                        </div>
+                        <div className="text-white/30 text-[10px] mt-0.5">Resend Email</div>
+                      </div>
+                      <div className="bg-white/[0.02] border border-white/[0.04] rounded-xl p-2.5 animate-[fadeSlideIn_0.4s_ease_0.3s_both]">
+                        <div className="text-purple-400/60 text-[10px] font-medium">Cost: $0.003</div>
+                        <div className="text-white/20 text-[9px] mt-0.5">247 tokens used</div>
+                      </div>
+                    </>
+                  )}
+                  {demo.stage < 8 && demo.stage >= 3 && (
+                    <div className="text-white/10 text-[10px] flex items-center gap-1.5">
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-purple-400/20 animate-[pulse_1s_infinite]" />
+                      Waiting for execution...
                     </div>
-                  ))}
-                  <div className={`bg-white/[0.02] border border-white/[0.04] rounded-xl p-2.5 transition-all duration-700 delay-[900ms] ${previewSection.visible ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-4'}`}>
-                    <div className="text-purple-400/60 text-[10px] font-medium">Cost: $0.003</div>
-                    <div className="text-white/20 text-[9px] mt-0.5">247 tokens used</div>
-                  </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -504,6 +609,26 @@ export default function LandingPage() {
         @keyframes dashFlow {
           0% { stroke-dashoffset: 14; }
           100% { stroke-dashoffset: 0; }
+        }
+        @keyframes nodeAppear {
+          0% { opacity: 0; transform: scale(0.3) translateY(20px); }
+          100% { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        @keyframes fadeSlideIn {
+          0% { opacity: 0; transform: translateY(8px); }
+          100% { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fadeIn {
+          0% { opacity: 0; }
+          100% { opacity: 1; }
+        }
+        @keyframes blink {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0; }
+        }
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.4; }
         }
       `}</style>
     </div>

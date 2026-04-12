@@ -45,7 +45,7 @@ function BuilderLayout() {
       // Load workflow
       const { data } = await supabase.from('workflows').select('*').eq('id', workflowId).single();
       if (data) {
-        dispatch({ type: 'SET_WORKFLOW_META', payload: { name: data.name || 'Untitled', emoji: data.emoji || '🤖' } });
+        dispatch({ type: 'SET_WORKFLOW_META', payload: { name: data.name || 'Untitled', emoji: data.emoji || '' } });
         // Reset all node statuses to idle on load (they may have stale running/success states)
         if (data.nodes?.length) {
           const cleanNodes = data.nodes.map((n: any) => ({
@@ -240,7 +240,7 @@ function BuilderLayout() {
 
       if (!response.ok || !response.body) {
         const err = await response.json().catch(() => ({ error: 'Execution failed' }));
-        tlog('fail', `❌ ${err.error || 'Execution failed'}`);
+        tlog('fail', ` ${err.error || 'Execution failed'}`);
         dispatch({ type: 'SET_RUNNING', payload: false });
         return;
       }
@@ -272,7 +272,7 @@ function BuilderLayout() {
                 } else if (data.type === 'node_error' && data.nodeId) {
                   dispatch({ type: 'SET_NODE_STATUS', payload: { id: data.nodeId, status: 'error' } });
                   dispatch({ type: 'ADD_EXECUTION_EVENT', payload: { id: `evt_${uid()}_err`, timestamp: new Date(data.timestamp), type: 'node_error', nodeId: data.nodeId, nodeName: data.nodeName, data: data.data, duration: data.duration } });
-                  tlog('fail', `[${data.nodeName}] ❌ ${data.data?.error}`);
+                  tlog('fail', `[${data.nodeName}]  ${data.data?.error}`);
                 } else if (data.type === 'log') {
                   dispatch({ type: 'ADD_EXECUTION_EVENT', payload: { id: `evt_${uid()}_log`, timestamp: new Date(data.timestamp || Date.now()), type: 'log', nodeId: data.nodeId, nodeName: data.nodeName, data: data.data } });
                   tlog('node', data.data?.message || '');
@@ -281,10 +281,10 @@ function BuilderLayout() {
                   tlog('http', `→ ${data.data?.service} ${data.data?.model || ''}`);
                 } else if (data.type === 'asset_created') {
                   dispatch({ type: 'ADD_EXECUTION_EVENT', payload: { id: `evt_${uid()}_asset`, timestamp: new Date(data.timestamp || Date.now()), type: 'asset_created', nodeId: data.nodeId, nodeName: data.nodeName, data: data.data } });
-                  tlog('store', `✅ ${data.data?.type}: ${data.data?.url}`);
+                  tlog('store', ` ${data.data?.type}: ${data.data?.url}`);
                 } else if (data.type === 'workflow_done') {
                   dispatch({ type: 'ADD_EXECUTION_EVENT', payload: { id: `evt_${uid()}_done`, timestamp: new Date(data.timestamp || Date.now()), type: 'workflow_done', data: data.data } });
-                  tlog('run', `✅ Done! Cost: $${data.data?.totalCost}, ${data.data?.assetCount} assets`);
+                  tlog('run', ` Done! Cost: $${data.data?.totalCost}, ${data.data?.assetCount} assets`);
                 }
               } else if (currentEvent === 'error') {
                 tlog('fail', data.message || 'Unknown error');
@@ -295,7 +295,7 @@ function BuilderLayout() {
         }
       }
     } catch (err: any) {
-      tlog('fail', `❌ ${err.message}`);
+      tlog('fail', ` ${err.message}`);
     } finally {
       dispatch({ type: 'SET_RUNNING', payload: false });
     }
@@ -321,7 +321,7 @@ function BuilderLayout() {
             <ArrowLeft className="w-4 h-4 text-[var(--muted-foreground)]" />
           </button>
           <div className="w-7 h-7 rounded-lg bg-[var(--primary)] flex items-center justify-center">
-            <span className="text-white text-sm">⚡</span>
+            <span className="text-white text-sm"></span>
           </div>
           <h1 className="text-sm font-bold text-[var(--foreground)]">AgentFlow</h1>
           {isEditingName ? (
@@ -421,7 +421,7 @@ function BuilderLayout() {
       {showShortcuts && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setShowShortcuts(false)}>
           <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-2xl p-6 max-w-sm w-full mx-4" onClick={e => e.stopPropagation()}>
-            <h2 className="text-sm font-bold text-[var(--foreground)] mb-4">⌨️ Keyboard Shortcuts</h2>
+            <h2 className="text-sm font-bold text-[var(--foreground)] mb-4">⌨ Keyboard Shortcuts</h2>
             <div className="space-y-2">
               {[['Delete / Backspace','Delete selected node'],['Ctrl+D','Duplicate selected'],['Ctrl+A','Select all nodes'],['Ctrl+0','Fit view'],['Escape','Deselect / close menus'],['Right-click','Context menu'],['Scroll','Zoom in/out'],['Drag handle','Connect nodes']].map(([key,desc]) => (
                 <div key={key} className="flex items-center justify-between">

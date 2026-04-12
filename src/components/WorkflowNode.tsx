@@ -166,7 +166,7 @@ function getNodeDescription(type: string, config: Record<string, unknown>): stri
 
 function getConfigSummary(type: string, config: Record<string, unknown>): string {
   const entries = Object.entries(config).filter(([, v]) => v !== undefined && v !== null && v !== '');
-  if (entries.length === 0) return '⚙️ Click to configure';
+  if (entries.length === 0) return 'Click to configure';
   
   // Show at most 2 fields, each truncated to 30 chars max
   const truncate = (s: string, max: number) => s.length > max ? s.slice(0, max) + '…' : s;

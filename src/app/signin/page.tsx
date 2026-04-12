@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { Zap } from 'lucide-react';
 
 export default function SignInPage() {
   const [email, setEmail] = useState('');
@@ -141,7 +142,7 @@ export default function SignInPage() {
         <div className="gradient-blob gradient-blob-violet w-[500px] h-[500px] opacity-15" />
         <div className="gradient-blob gradient-blob-fuchsia w-[300px] h-[300px] top-[20%] right-[10%] opacity-10" />
         <div className="relative z-10 text-center max-w-[360px]">
-          <div className="text-6xl mb-6">⚡</div>
+          <div className="mb-6"><Zap className="w-14 h-14 text-[var(--primary)] mx-auto drop-shadow-[0_0_20px_rgba(139,92,246,0.5)]" strokeWidth={1.5} /></div>
           <h2 className="text-h3 text-[var(--foreground)] mb-3">Build agents in seconds</h2>
           <p className="text-body text-[var(--text-secondary)] leading-relaxed mb-8">
             One sentence. One agent. Every step visible. No code required.

@@ -110,7 +110,7 @@ export default function InspectorPanel() {
 
 function TimelineView({ events }: { events: ExecutionEvent[] }) {
   if (events.length === 0) {
-    return <EmptyState emoji="⏱️" title="No events yet" description="Run your workflow to see the execution timeline here" />;
+    return <EmptyState emoji="" title="No events yet" description="Run your workflow to see the execution timeline here" />;
   }
 
   return (
@@ -176,7 +176,7 @@ function NetworkView({ events }: { events: ExecutionEvent[] }) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   if (apiEvents.length === 0) {
-    return <EmptyState emoji="🌐" title="No API calls yet" description="HTTP requests to fal.ai, Cloudinary, and other services will appear here during execution" />;
+    return <EmptyState emoji="" title="No API calls yet" description="HTTP requests to fal.ai, Cloudinary, and other services will appear here during execution" />;
   }
 
   return (
@@ -200,7 +200,7 @@ function NetworkView({ events }: { events: ExecutionEvent[] }) {
         const isExpanded = expandedId === event.id;
 
         const statusColor = status >= 500 ? 'text-red-400' : status >= 400 ? 'text-yellow-400' : 'text-green-400';
-        const serviceEmoji = service.includes('fal') ? '🤖' : service.includes('cloudinary') ? '☁️' : service.includes('claude') ? '🧠' : '🔌';
+        const serviceEmoji = service.includes('fal') ? '' : service.includes('cloudinary') ? '' : service.includes('claude') ? '' : '';
 
         return (
           <div key={event.id}>
@@ -268,7 +268,7 @@ function LogsView() {
   }, [terminalLogs.length, autoScroll]);
 
   if (terminalLogs.length === 0) {
-    return <EmptyState emoji="📋" title="No logs yet" description="Console logs and events will stream here in real time when you run a workflow" />;
+    return <EmptyState emoji="" title="No logs yet" description="Console logs and events will stream here in real time when you run a workflow" />;
   }
 
   const levelColors: Record<string, string> = {
@@ -337,7 +337,7 @@ function VariablesView({ events }: { events: ExecutionEvent[] }) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   if (nodeEndEvents.length === 0) {
-    return <EmptyState emoji="📦" title="No variables yet" description="Data passed between nodes will be shown here after each node completes" />;
+    return <EmptyState emoji="" title="No variables yet" description="Data passed between nodes will be shown here after each node completes" />;
   }
 
   return (
@@ -482,10 +482,10 @@ function CostView({ events }: { events: ExecutionEvent[] }) {
 
       {/* Stats grid */}
       <div className="grid grid-cols-2 gap-2">
-        <StatCard label="API Calls" value={apiCallEvents.length.toString()} icon="🔌" />
-        <StatCard label="Assets Created" value={assetEvents.length.toString()} icon="📦" />
-        <StatCard label="Total Duration" value={`${(nodeEndEvents.reduce((s, e) => s + (e.duration || 0), 0) / 1000).toFixed(1)}s`} icon="⏱️" />
-        <StatCard label="Avg per Node" value={completedNodes > 0 ? `$${(totalCost / completedNodes).toFixed(3)}` : '$0'} icon="📊" />
+        <StatCard label="API Calls" value={apiCallEvents.length.toString()} icon="" />
+        <StatCard label="Assets Created" value={assetEvents.length.toString()} icon="" />
+        <StatCard label="Total Duration" value={`${(nodeEndEvents.reduce((s, e) => s + (e.duration || 0), 0) / 1000).toFixed(1)}s`} icon="⏱" />
+        <StatCard label="Avg per Node" value={completedNodes > 0 ? `$${(totalCost / completedNodes).toFixed(3)}` : '$0'} icon="" />
       </div>
 
       {/* Cost by model */}

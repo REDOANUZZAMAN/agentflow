@@ -25,20 +25,20 @@ export interface TerminalLogEntry {
 }
 
 const LEVEL_CONFIG: Record<string, { emoji: string; color: string; label: string }> = {
-  agent:  { emoji: '🤖', color: 'text-purple-400', label: 'agent' },
-  plan:   { emoji: '📋', color: 'text-blue-400',   label: 'plan'  },
-  build:  { emoji: '🔧', color: 'text-cyan-400',   label: 'build' },
-  run:    { emoji: '▶',  color: 'text-green-400',   label: 'run'   },
-  node:   { emoji: '⚙️',  color: 'text-gray-300',   label: 'node'  },
-  http:   { emoji: '🌐', color: 'text-gray-500',   label: 'http'  },
-  store:  { emoji: '💾', color: 'text-yellow-400',  label: 'store' },
-  think:  { emoji: '💭', color: 'text-purple-300/60', label: 'think' },
-  error:  { emoji: '⚠️',  color: 'text-orange-400', label: 'error' },
-  fail:   { emoji: '❌', color: 'text-red-400',     label: 'fail'  },
-  fix:    { emoji: '🔧', color: 'text-orange-300',  label: 'fix'   },
-  notify: { emoji: '📨', color: 'text-green-300',   label: 'notify'},
-  cost:   { emoji: '💰', color: 'text-yellow-300',  label: 'cost'  },
-  task:   { emoji: '📋', color: 'text-blue-300',    label: 'task'  },
+  agent:  { emoji: '>',  color: 'text-purple-400', label: 'agent' },
+  plan:   { emoji: '>',  color: 'text-blue-400',   label: 'plan'  },
+  build:  { emoji: '>',  color: 'text-cyan-400',   label: 'build' },
+  run:    { emoji: '>',  color: 'text-green-400',   label: 'run'   },
+  node:   { emoji: '*',   color: 'text-gray-300',   label: 'node'  },
+  http:   { emoji: '~',  color: 'text-gray-500',   label: 'http'  },
+  store:  { emoji: '>',  color: 'text-yellow-400',  label: 'store' },
+  think:  { emoji: '.',  color: 'text-purple-300/60', label: 'think' },
+  error:  { emoji: '!',   color: 'text-orange-400', label: 'error' },
+  fail:   { emoji: 'x',  color: 'text-red-400',     label: 'fail'  },
+  fix:    { emoji: '>',  color: 'text-orange-300',  label: 'fix'   },
+  notify: { emoji: '>',  color: 'text-green-300',   label: 'notify'},
+  cost:   { emoji: '$',  color: 'text-yellow-300',  label: 'cost'  },
+  task:   { emoji: '>',  color: 'text-blue-300',    label: 'task'  },
 };
 
 // ─── Terminal Component ──────────────────────────────────────

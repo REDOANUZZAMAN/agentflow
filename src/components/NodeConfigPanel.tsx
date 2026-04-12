@@ -227,7 +227,7 @@ function ConfigField({ field, value, onChange }: { field: FieldDef; value: unkno
             ))}
           </select>
           {isEmpty && (
-            <p className="text-[9px] text-red-400 mt-0.5">⚠️ Required — select a model to run this node</p>
+            <p className="text-[9px] text-red-400 mt-0.5"> Required — select a model to run this node</p>
           )}
         </div>
       );
@@ -236,7 +236,7 @@ function ConfigField({ field, value, onChange }: { field: FieldDef; value: unkno
       return (
         <div className="border border-dashed border-[var(--border)] rounded-lg p-3 bg-[var(--card)]/50">
           <label className="text-[11px] font-medium text-[var(--muted-foreground)] mb-1 block">
-            🔗 {field.label}
+             {field.label}
           </label>
           <p className="text-[10px] text-[var(--muted-foreground)] leading-relaxed">
             {field.placeholder}
@@ -354,10 +354,10 @@ function getConfigFields(type: NodeType | string): FieldDef[] {
         { key: 'elementName', label: 'Element Name', type: 'text', placeholder: '@Hacker, @HackerRoom, etc.', required: true },
         { key: 'description', label: 'Visual Description', type: 'textarea', placeholder: 'Describe how this character/location should look consistently...', required: true },
         { key: 'model', label: 'Generation Model', type: 'select', required: true, options: [
-          { value: 'fal-ai/nano-banana-2', label: '⚡ Nano Banana 2 (default, fast, $0.04)' },
-          { value: 'fal-ai/nano-banana-2/edit', label: '🎨 Nano Banana 2 Edit (with refs, $0.04)' },
-          { value: 'fal-ai/bytedance/seedream/v4.5/text-to-image', label: '✨ Seedream 4.5 (4K, text-in-image, $0.06)' },
-          { value: 'fal-ai/bytedance/seedream/v4.5/edit', label: '🌟 Seedream 4.5 Edit (up to 10 refs, $0.08)' },
+          { value: 'fal-ai/nano-banana-2', label: ' Nano Banana 2 (default, fast, $0.04)' },
+          { value: 'fal-ai/nano-banana-2/edit', label: ' Nano Banana 2 Edit (with refs, $0.04)' },
+          { value: 'fal-ai/bytedance/seedream/v4.5/text-to-image', label: ' Seedream 4.5 (4K, text-in-image, $0.06)' },
+          { value: 'fal-ai/bytedance/seedream/v4.5/edit', label: ' Seedream 4.5 Edit (up to 10 refs, $0.08)' },
         ]},
         { key: 'referenceImageUrl', label: 'Reference Image URL', type: 'text', placeholder: 'Optional: URL of an existing reference image' },
       ];
@@ -366,10 +366,10 @@ function getConfigFields(type: NodeType | string): FieldDef[] {
         { key: 'prompt', label: 'Photo Prompt', type: 'textarea', placeholder: 'Describe the shot photo...', required: true },
         { key: 'negativePrompt', label: 'Negative Prompt', type: 'textarea', placeholder: 'What to avoid...' },
         { key: 'model', label: 'Model', type: 'select', required: true, options: [
-          { value: 'fal-ai/nano-banana-2', label: '⚡ Nano Banana 2 (default, $0.04)' },
-          { value: 'fal-ai/nano-banana-2/edit', label: '🎨 Nano Banana 2 Edit (with refs, $0.04)' },
-          { value: 'fal-ai/bytedance/seedream/v4.5/text-to-image', label: '✨ Seedream 4.5 (4K, $0.06)' },
-          { value: 'fal-ai/bytedance/seedream/v4.5/edit', label: '🌟 Seedream 4.5 Edit (10 refs, $0.08)' },
+          { value: 'fal-ai/nano-banana-2', label: ' Nano Banana 2 (default, $0.04)' },
+          { value: 'fal-ai/nano-banana-2/edit', label: ' Nano Banana 2 Edit (with refs, $0.04)' },
+          { value: 'fal-ai/bytedance/seedream/v4.5/text-to-image', label: ' Seedream 4.5 (4K, $0.06)' },
+          { value: 'fal-ai/bytedance/seedream/v4.5/edit', label: ' Seedream 4.5 Edit (10 refs, $0.08)' },
         ]},
         { key: 'width', label: 'Width', type: 'number', placeholder: '1920' },
         { key: 'height', label: 'Height', type: 'number', placeholder: '1080' },
@@ -380,9 +380,9 @@ function getConfigFields(type: NodeType | string): FieldDef[] {
         { key: 'prompt', label: 'Video Prompt', type: 'textarea', placeholder: 'Describe the motion/action...', required: true },
         { key: 'negativePrompt', label: 'Negative Prompt', type: 'textarea', placeholder: 'What to avoid...' },
         { key: 'model', label: 'Model', type: 'select', required: true, options: [
-          { value: 'fal-ai/kling-video/o3/pro/image-to-video', label: '🎬 Kling O3 Pro Image→Video (default, $0.95)' },
-          { value: 'fal-ai/kling-video/o3/pro/text-to-video', label: '📝 Kling O3 Pro Text→Video ($0.95)' },
-          { value: 'fal-ai/kling-video/o3/pro/reference-to-video', label: '🧬 Kling O3 Pro Reference→Video ($1.20)' },
+          { value: 'fal-ai/kling-video/o3/pro/image-to-video', label: ' Kling O3 Pro Image→Video (default, $0.95)' },
+          { value: 'fal-ai/kling-video/o3/pro/text-to-video', label: ' Kling O3 Pro Text→Video ($0.95)' },
+          { value: 'fal-ai/kling-video/o3/pro/reference-to-video', label: ' Kling O3 Pro Reference→Video ($1.20)' },
         ]},
         { key: 'duration', label: 'Duration (seconds)', type: 'number', placeholder: '5' },
         { key: 'firstFrameUrl', label: 'First Frame Image URL', type: 'text', placeholder: 'Auto-filled from Photo Generator' },
@@ -396,8 +396,8 @@ function getConfigFields(type: NodeType | string): FieldDef[] {
           { value: 'Diana', label: 'Diana (female)' },
         ]},
         { key: 'model', label: 'TTS Model', type: 'select', options: [
-          { value: 'fal-ai/elevenlabs/tts/turbo-v2.5', label: '🗣️ ElevenLabs Turbo v2.5 ($0.03)' },
-          { value: 'fal-ai/elevenlabs/text-to-dialogue/eleven-v3', label: '🎭 ElevenLabs v3 Dialogue ($0.05)' },
+          { value: 'fal-ai/elevenlabs/tts/turbo-v2.5', label: ' ElevenLabs Turbo v2.5 ($0.03)' },
+          { value: 'fal-ai/elevenlabs/text-to-dialogue/eleven-v3', label: ' ElevenLabs v3 Dialogue ($0.05)' },
         ]},
       ];
     case 'music_generator':
@@ -405,23 +405,23 @@ function getConfigFields(type: NodeType | string): FieldDef[] {
         { key: 'prompt', label: 'Music Description', type: 'textarea', placeholder: 'Describe the mood, genre, tempo...', required: true },
         { key: 'durationMs', label: 'Duration (ms)', type: 'number', placeholder: '30000' },
         { key: 'model', label: 'Model', type: 'select', options: [
-          { value: 'fal-ai/elevenlabs/music', label: '🎵 ElevenLabs Music ($0.10)' },
+          { value: 'fal-ai/elevenlabs/music', label: ' ElevenLabs Music ($0.10)' },
         ]},
       ];
     case 'project_orchestrator':
       return [
         { key: 'projectName', label: 'Project Name', type: 'text', placeholder: 'My Video Project', required: true },
         { key: 'photoModel', label: 'Default Photo Model', type: 'select', options: [
-          { value: 'fal-ai/nano-banana-2', label: '⚡ Nano Banana 2 (fast)' },
-          { value: 'fal-ai/bytedance/seedream/v4.5/text-to-image', label: '✨ Seedream 4.5 (4K)' },
+          { value: 'fal-ai/nano-banana-2', label: ' Nano Banana 2 (fast)' },
+          { value: 'fal-ai/bytedance/seedream/v4.5/text-to-image', label: ' Seedream 4.5 (4K)' },
         ]},
         { key: 'videoModel', label: 'Default Video Model', type: 'select', options: [
-          { value: 'fal-ai/kling-video/o3/pro/image-to-video', label: '🎬 Kling O3 Pro' },
-          { value: 'fal-ai/kling-video/o3/pro/text-to-video', label: '📝 Kling O3 Text' },
+          { value: 'fal-ai/kling-video/o3/pro/image-to-video', label: ' Kling O3 Pro' },
+          { value: 'fal-ai/kling-video/o3/pro/text-to-video', label: ' Kling O3 Text' },
         ]},
         { key: 'voiceModel', label: 'Default Voice Model', type: 'select', options: [
-          { value: 'fal-ai/elevenlabs/tts/turbo-v2.5', label: '🗣️ ElevenLabs Turbo v2.5' },
-          { value: 'fal-ai/elevenlabs/text-to-dialogue/eleven-v3', label: '🎭 ElevenLabs v3 Dialogue' },
+          { value: 'fal-ai/elevenlabs/tts/turbo-v2.5', label: ' ElevenLabs Turbo v2.5' },
+          { value: 'fal-ai/elevenlabs/text-to-dialogue/eleven-v3', label: ' ElevenLabs v3 Dialogue' },
         ]},
         { key: 'cloudinaryFolder', label: 'Cloudinary Folder', type: 'text', placeholder: 'projects/{projectId}' },
       ];

@@ -232,7 +232,7 @@ export default function ChatPanel() {
           videos.forEach((vid: any) => { summary += `- ${vid.videoUrl}\n`; });
         }
         if (resultData.errors?.length > 0) {
-          summary += `\n⚠️ **Errors:** ${resultData.errors.join(', ')}`;
+          summary += `\n**Errors:** ${resultData.errors.join(', ')}`;
         }
         
         addMessage({
@@ -427,7 +427,7 @@ export default function ChatPanel() {
           status: 'done' as const,
         })),
         buttons: streamToolCalls.some(tc => tc.name === 'add_node')
-          ? [{ label: '▶️ Run Workflow', action: 'Run the workflow to test it' }, { label: '✏️ Make Changes', action: 'What changes can you make?' }]
+          ? [{ label: 'Run Workflow', action: 'Run the workflow to test it' }, { label: 'Make Changes', action: 'What changes can you make?' }]
           : undefined,
       };
       addMessage(aiMsg);

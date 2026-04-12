@@ -6,43 +6,44 @@
 
 @layer base {
   :root {
-    --background: #0A0A0B;
-    --bg-elevated: #121214;
-    --bg-sunken: #060607;
-    --foreground: #FAFAFA;
-    --text-secondary: #A1A1AA;
-    --text-muted: #52525B;
-    --border: #2A2A30;
-    --border-subtle: #1F1F23;
-    --card: #121214;
-    --card-foreground: #FAFAFA;
-    --popover: #121214;
-    --popover-foreground: #FAFAFA;
+    /* Deep purple palette — matching the Coming Soon aesthetic */
+    --background: #1A1030;
+    --bg-elevated: #221845;
+    --bg-sunken: #120D22;
+    --foreground: #E8DEFF;
+    --text-secondary: #B8A8D8;
+    --text-muted: #7B6A9E;
+    --border: rgba(255, 255, 255, 0.12);
+    --border-subtle: rgba(255, 255, 255, 0.08);
+    --card: #221845;
+    --card-foreground: #E8DEFF;
+    --popover: #221845;
+    --popover-foreground: #E8DEFF;
     --primary: #8B5CF6;
-    --primary-foreground: #FAFAFA;
-    --accent: #8B5CF6;
-    --accent-foreground: #FAFAFA;
-    --accent-glow: rgba(139, 92, 246, 0.15);
-    --accent-glow-strong: rgba(139, 92, 246, 0.3);
-    --secondary: #1F1F23;
-    --secondary-foreground: #FAFAFA;
-    --muted: #1F1F23;
-    --muted-foreground: #A1A1AA;
+    --primary-foreground: #FFFFFF;
+    --accent: #A78BFA;
+    --accent-foreground: #FFFFFF;
+    --accent-glow: rgba(139, 92, 246, 0.2);
+    --accent-glow-strong: rgba(139, 92, 246, 0.4);
+    --secondary: #2E1F4A;
+    --secondary-foreground: #E8DEFF;
+    --muted: #2E1F4A;
+    --muted-foreground: #B8A8D8;
     --destructive: #EF4444;
-    --destructive-foreground: #FAFAFA;
+    --destructive-foreground: #FFFFFF;
     --success: #10B981;
     --warning: #F59E0B;
     --info: #3B82F6;
-    --input: #060607;
+    --input: #120D22;
     --ring: #8B5CF6;
     --radius-sm: 6px;
     --radius-md: 10px;
     --radius-lg: 16px;
     --radius-full: 9999px;
-    --shadow-sm: 0 1px 2px rgba(0,0,0,0.4);
-    --shadow-md: 0 4px 12px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.04) inset;
-    --shadow-lg: 0 20px 40px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04) inset;
-    --shadow-glow: 0 0 0 1px rgba(139,92,246,0.3), 0 0 20px rgba(139,92,246,0.15);
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.5);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.06) inset;
+    --shadow-lg: 0 20px 40px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.06) inset;
+    --shadow-glow: 0 0 0 1px rgba(139,92,246,0.3), 0 0 20px rgba(139,92,246,0.2);
     --ease-out: cubic-bezier(0.4, 0, 0.2, 1);
     --duration-fast: 150ms;
     --duration-normal: 200ms;
@@ -64,8 +65,8 @@
 
   ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: #2A2A30; border-radius: 3px; }
-  ::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
+  ::-webkit-scrollbar-thumb { background: rgba(139, 92, 246, 0.25); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(139, 92, 246, 0.4); }
 }
 
 @layer components {

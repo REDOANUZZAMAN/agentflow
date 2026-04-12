@@ -153,6 +153,9 @@ function WorkflowCanvasInner() {
     dispatch({ type: 'ADD_NODE', payload: node });
   }, [screenToFlowPosition, dispatch]);
 
+  // Get React Flow instance for reading selection
+  const { getNodes, getEdges } = useReactFlow();
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -160,11 +163,38 @@ function WorkflowCanvasInner() {
       const target = e.target as HTMLElement;
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.contentEditable === 'true') return;
 
-      // Delete selected node
-      if ((e.key === 'Delete' || e.key === 'Backspace') && state.selectedNodeId) {
+      // Undo: Ctrl+Z / Cmd+Z
+      if (isCmd && e.key === 'z' && !e.shiftKey) {
         e.preventDefault();
-        dispatch({ type: 'DELETE_NODE', payload: state.selectedNodeId });
-        dispatch({ type: 'SET_SELECTED_NODE', payload: null });
+        dispatch({ type: 'UNDO' });
+        return;
+      }
+      // Redo: Ctrl+Shift+Z / Cmd+Shift+Z  or  Ctrl+Y
+      if ((isCmd && e.key === 'z' && e.shiftKey) || (isCmd && e.key === 'y')) {
+        e.preventDefault();
+        dispatch({ type: 'REDO' });
+        return;
+      }
+
+      // Delete selected nodes/edges (multi-select aware)
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        const selectedNodes = getNodes().filter((n) => n.selected);
+        const selectedEdges = getEdges().filter((e) => e.selected);
+        if (selectedNodes.length > 0 || selectedEdges.length > 0) {
+          e.preventDefault();
+          dispatch({
+            type: 'DELETE_SELECTED',
+            payload: {
+              nodeIds: selectedNodes.map((n) => n.id),
+              edgeIds: selectedEdges.map((e) => e.id),
+            },
+          });
+        } else if (state.selectedNodeId) {
+          // Fallback: single selected node from our state
+          e.preventDefault();
+          dispatch({ type: 'DELETE_NODE', payload: state.selectedNodeId });
+          dispatch({ type: 'SET_SELECTED_NODE', payload: null });
+        }
       }
       // Duplicate: Cmd+D
       if (isCmd && e.key === 'd' && state.selectedNodeId) {
@@ -199,7 +229,7 @@ function WorkflowCanvasInner() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [state.selectedNodeId, state.nodes, dispatch, fitView, setRfNodes]);
+  }, [state.selectedNodeId, state.nodes, dispatch, fitView, setRfNodes, getNodes, getEdges]);
 
   // Context menu actions
   const duplicateSelected = useCallback(() => {
@@ -248,12 +278,38 @@ function WorkflowCanvasInner() {
             {state.nodes.length} node{state.nodes.length !== 1 ? 's' : ''}
           </span>
         </div>
-        {state.isRunning && (
-          <div className="flex items-center gap-2 text-xs text-[var(--success)]">
-            <span className="w-2 h-2 rounded-full bg-[var(--success)] animate-pulse" />
-            Running...
-          </div>
-        )}
+        <div className="flex items-center gap-1">
+          {/* Undo/Redo buttons */}
+          <button
+            onClick={() => dispatch({ type: 'UNDO' })}
+            disabled={state.history.length === 0}
+            className="p-1.5 rounded-md text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--secondary)] transition-colors disabled:opacity-25 disabled:cursor-not-allowed"
+            title={`Undo (Ctrl+Z) • ${state.history.length} steps`}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 7v6h6" /><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6.69 3L3 13" />
+            </svg>
+          </button>
+          <button
+            onClick={() => dispatch({ type: 'REDO' })}
+            disabled={state.future.length === 0}
+            className="p-1.5 rounded-md text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--secondary)] transition-colors disabled:opacity-25 disabled:cursor-not-allowed"
+            title={`Redo (Ctrl+Shift+Z) • ${state.future.length} steps`}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 7v6h-6" /><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6.69 3L21 13" />
+            </svg>
+          </button>
+
+          <div className="w-px h-4 bg-[var(--border)] mx-1" />
+
+          {state.isRunning && (
+            <div className="flex items-center gap-2 text-xs text-[var(--success)]">
+              <span className="w-2 h-2 rounded-full bg-[var(--success)] animate-pulse" />
+              Running...
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Canvas */}

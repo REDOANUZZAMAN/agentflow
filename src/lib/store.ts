@@ -6,13 +6,21 @@ import { ChatMessage, ExecutionEvent, WorkflowNode, WorkflowEdge, NodeType, getN
 import type { TerminalLogEntry } from '@/components/TerminalPanel';
 import { applyDefaults } from './node-defaults';
 
+// History snapshot for undo/redo
+interface HistorySnapshot {
+  nodes: WorkflowNode[];
+  edges: WorkflowEdge[];
+}
+
+const MAX_HISTORY = 50;
+
 // State
 export interface AppState {
   // Workflow
   nodes: WorkflowNode[];
   edges: WorkflowEdge[];
   workflowName: string;
-  workflowEmoji: string
+  workflowEmoji: string;
   // Chat
   messages: ChatMessage[];
   isAiTyping: boolean;
@@ -36,6 +44,10 @@ export interface AppState {
   // Panel widths (percentages)
   leftPanelWidth: number;
   rightPanelWidth: number;
+
+  // Undo/Redo history
+  history: HistorySnapshot[];
+  future: HistorySnapshot[];
 }
 
 export const initialState: AppState = {
@@ -75,6 +87,9 @@ export const initialState: AppState = {
 
   leftPanelWidth: 25,
   rightPanelWidth: 25,
+
+  history: [],
+  future: [],
 };
 
 // Actions
@@ -113,12 +128,85 @@ export type Action =
   // Terminal actions
   | { type: 'ADD_TERMINAL_LOG'; payload: TerminalLogEntry }
   | { type: 'CLEAR_TERMINAL_LOGS' }
-  | { type: 'TOGGLE_TERMINAL_LOG_EXPAND'; payload: string };
+  | { type: 'TOGGLE_TERMINAL_LOG_EXPAND'; payload: string }
+  // Undo/Redo
+  | { type: 'UNDO' }
+  | { type: 'REDO' }
+  // Multi-select delete
+  | { type: 'DELETE_SELECTED'; payload: { nodeIds: string[]; edgeIds: string[] } };
+
+// Helper: push current nodes/edges to history stack
+function pushHistory(state: AppState): { history: HistorySnapshot[]; future: HistorySnapshot[] } {
+  const snapshot: HistorySnapshot = {
+    nodes: JSON.parse(JSON.stringify(state.nodes)),
+    edges: JSON.parse(JSON.stringify(state.edges)),
+  };
+  return {
+    history: [...state.history.slice(-(MAX_HISTORY - 1)), snapshot],
+    future: [], // clear redo stack on new action
+  };
+}
 
 export function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
-    case 'ADD_NODE':
-      return { ...state, nodes: [...state.nodes, action.payload] };
+    // ── Undo/Redo ────────────────────────────────────
+    case 'UNDO': {
+      if (state.history.length === 0) return state;
+      const prev = state.history[state.history.length - 1];
+      const currentSnapshot: HistorySnapshot = {
+        nodes: JSON.parse(JSON.stringify(state.nodes)),
+        edges: JSON.parse(JSON.stringify(state.edges)),
+      };
+      return {
+        ...state,
+        nodes: prev.nodes,
+        edges: prev.edges,
+        history: state.history.slice(0, -1),
+        future: [...state.future, currentSnapshot],
+        selectedNodeId: null,
+      };
+    }
+
+    case 'REDO': {
+      if (state.future.length === 0) return state;
+      const next = state.future[state.future.length - 1];
+      const currentSnapshot: HistorySnapshot = {
+        nodes: JSON.parse(JSON.stringify(state.nodes)),
+        edges: JSON.parse(JSON.stringify(state.edges)),
+      };
+      return {
+        ...state,
+        nodes: next.nodes,
+        edges: next.edges,
+        history: [...state.history, currentSnapshot],
+        future: state.future.slice(0, -1),
+        selectedNodeId: null,
+      };
+    }
+
+    // ── Multi-select delete ──────────────────────────
+    case 'DELETE_SELECTED': {
+      const { nodeIds, edgeIds } = action.payload;
+      if (nodeIds.length === 0 && edgeIds.length === 0) return state;
+      const nodeSet = new Set(nodeIds);
+      const edgeSet = new Set(edgeIds);
+      const hist = pushHistory(state);
+      return {
+        ...state,
+        ...hist,
+        nodes: state.nodes.filter((n) => !nodeSet.has(n.id)),
+        edges: state.edges.filter((e) =>
+          !edgeSet.has(e.id) && !nodeSet.has(e.source) && !nodeSet.has(e.target)
+        ),
+        selectedNodeId: null,
+      };
+    }
+
+    // ── Node/Edge mutations (with history) ───────────
+    case 'ADD_NODE': {
+      const hist = pushHistory(state);
+      return { ...state, ...hist, nodes: [...state.nodes, action.payload] };
+    }
 
     case 'UPDATE_NODE':
       return {
@@ -128,26 +216,38 @@ export function reducer(state: AppState, action: Action): AppState {
         ),
       };
 
-    case 'DELETE_NODE':
+    case 'DELETE_NODE': {
+      const hist = pushHistory(state);
       return {
         ...state,
+        ...hist,
         nodes: state.nodes.filter((n) => n.id !== action.payload),
         edges: state.edges.filter((e) => e.source !== action.payload && e.target !== action.payload),
       };
+    }
 
-    case 'SET_NODES':
-      return { ...state, nodes: action.payload };
+    case 'SET_NODES': {
+      const hist = pushHistory(state);
+      return { ...state, ...hist, nodes: action.payload };
+    }
 
-    case 'ADD_EDGE':
-      return { ...state, edges: [...state.edges, action.payload] };
+    case 'ADD_EDGE': {
+      const hist = pushHistory(state);
+      return { ...state, ...hist, edges: [...state.edges, action.payload] };
+    }
 
-    case 'DELETE_EDGE':
-      return { ...state, edges: state.edges.filter((e) => e.id !== action.payload) };
+    case 'DELETE_EDGE': {
+      const hist = pushHistory(state);
+      return { ...state, ...hist, edges: state.edges.filter((e) => e.id !== action.payload) };
+    }
 
-    case 'SET_EDGES':
-      return { ...state, edges: action.payload };
+    case 'SET_EDGES': {
+      const hist = pushHistory(state);
+      return { ...state, ...hist, edges: action.payload };
+    }
 
     case 'MOVE_NODE':
+      // Don't push history for every pixel of dragging — handled via onNodeDragStop
       return {
         ...state,
         nodes: state.nodes.map((n) =>

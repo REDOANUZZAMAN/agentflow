@@ -86,7 +86,11 @@ export async function POST(req: NextRequest) {
       try {
         send('status', { phase: 'starting', message: 'Starting workflow execution...', executionId });
 
-        const result = await executeWorkflow(nodes, edges, emit);
+        const result = await executeWorkflow(nodes, edges, emit, {
+          workflowId: workflowId || undefined,
+          executionId: executionId || undefined,
+          userId: userId || undefined,
+        });
 
         send('result', {
           success: result.success,
@@ -140,12 +144,12 @@ export async function POST(req: NextRequest) {
                 workflow_id: workflowId || null,
                 execution_id: executionId || null,
                 type: assetType,
-                cloudinary_public_id: asset.cloudinaryPublicId || asset.public_id || null,
+                cloudinary_public_id: asset.cloudinaryId || asset.cloudinaryPublicId || asset.public_id || null,
                 cloudinary_url: url,
                 thumbnail_url: asset.thumbnailUrl || (assetType === 'photo' ? url : assetType === 'video' ? url.replace('/video/upload/', '/video/upload/so_0,w_400,h_300,c_fill,f_jpg/').replace(/\.\w+$/, '.jpg') : null),
                 filename: filename,
-                scene: asset.scene || null,
-                shot: asset.shot || null,
+                scene: asset.sceneNumber || asset.scene || null,
+                shot: asset.shotNumber || asset.shot || null,
                 prompt: asset.prompt || null,
                 negative_prompt: asset.negativePrompt || null,
                 model: asset.model || null,

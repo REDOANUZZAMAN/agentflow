@@ -4,11 +4,18 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Send, Sparkles, Bot, User, Loader2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { useParams } from 'next/navigation';
 import { useApp } from '@/lib/context';
 import { createNode, createEdge } from '@/lib/store';
 import type { ChatMessage, NodeType, Task } from '@/lib/types';
 import { v4 as uuidv4 } from 'uuid';
+import { createClient } from '@supabase/supabase-js';
 import TaskListCard from './TaskListCard';
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+);
 
 export default function ChatPanel() {
   const { state, dispatch, addMessage } = useApp();
@@ -114,9 +121,19 @@ export default function ChatPanel() {
   }, [dispatch]);
 
   // Real workflow execution via /api/execute SSE endpoint
+  const params = useParams();
   const simulateWorkflowRun = useCallback(async () => {
     dispatch({ type: 'SET_RUNNING', payload: true });
     dispatch({ type: 'CLEAR_EXECUTION_EVENTS' });
+
+    // Get real workflowId from URL and userId from Supabase auth
+    const workflowIdParam = params?.workflowId as string | undefined;
+    const workflowId = workflowIdParam && workflowIdParam !== 'new' ? workflowIdParam : undefined;
+    let userId: string | undefined;
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      userId = user?.id;
+    } catch { /* ignore auth errors */ }
 
     try {
       const response = await fetch('/api/execute', {
@@ -125,6 +142,8 @@ export default function ChatPanel() {
         body: JSON.stringify({
           nodes: state.nodes,
           edges: state.edges,
+          workflowId,
+          userId,
         }),
       });
 

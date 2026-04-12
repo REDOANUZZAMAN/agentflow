@@ -625,14 +625,16 @@ function topologicalSort(nodes: WorkflowNode[], edges: Array<{ source: string; t
 export async function executeWorkflow(
   nodes: WorkflowNode[],
   edges: Array<{ source: string; target: string }>,
-  emit: (event: ExecutionEvent) => void
+  emit: (event: ExecutionEvent) => void,
+  options?: { workflowId?: string; executionId?: string; userId?: string }
 ): Promise<{ success: boolean; totalCost: number; assets: any[]; errors: string[] }> {
-  const projectId = `proj_${Date.now()}`;
-  const executionId = `exec_${Date.now()}`;
+  // Use real IDs from caller when available, fallback to generated ones
+  const projectId = options?.workflowId || `proj_${Date.now()}`;
+  const executionId = options?.executionId || `exec_${Date.now()}`;
   const ctx: ExecutionContext = {
     projectId,
     executionId,
-    userId: 'local',
+    userId: options?.userId || 'local',
     nodeOutputs: new Map(),
     edges,
     emit,

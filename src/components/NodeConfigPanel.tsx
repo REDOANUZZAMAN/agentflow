@@ -375,7 +375,7 @@ function getConfigFields(type: NodeType | string): FieldDef[] {
       ];
     case 'manual_trigger':
       return [
-        { key: '_runHint', label: 'Click "▶ Run Workflow" in the top bar or press Ctrl+Enter to trigger this workflow.', type: 'text', placeholder: '' },
+        { key: '_runHint', label: 'Click "Run Workflow" in the top bar or press Ctrl+Enter to trigger this workflow.', type: 'text', placeholder: '' },
       ];
     case 'webhook_trigger':
       return [

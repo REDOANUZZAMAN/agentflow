@@ -306,5 +306,5 @@ export function formatValidationErrors(errors: ValidationError[]): string {
     return `• ${err.nodeName || err.nodeType} (${err.nodeType}): ${parts.join('; ')}`;
   });
 
-  return `⚠ Cannot run — ${errors.length} node(s) have issues:\n\n${lines.join('\n')}`;
+  return `WARNING: Cannot run — ${errors.length} node(s) have issues:\n\n${lines.join('\n')}`;
 }

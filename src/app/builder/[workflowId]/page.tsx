@@ -217,7 +217,7 @@ function BuilderLayout() {
     const tlog = (level: any, message: string) => {
       dispatch({ type: 'ADD_TERMINAL_LOG', payload: { id: `tl_${uid()}`, timestamp: new Date(), level, message } });
     };
-    tlog('run', `▶ Executing workflow: "${state.workflowName}" — ${state.nodes.length} nodes`);
+    tlog('run', `> Executing workflow: "${state.workflowName}" — ${state.nodes.length} nodes`);
 
     // Get user ID for execution persistence
     let currentUserId: string | undefined;
@@ -354,7 +354,7 @@ function BuilderLayout() {
           )}
         </div>
         <div className="flex items-center gap-2">
-          {/* ▶ Run Workflow Button */}
+          {/* Run Workflow Button */}
           {state.isRunning ? (
             <button
               onClick={() => dispatch({ type: 'SET_RUNNING', payload: false })}

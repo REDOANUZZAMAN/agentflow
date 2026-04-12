@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, Sparkles, Bot, User, Loader2 } from 'lucide-react';
+import { Send, Sparkles, Bot, User, Loader2, Play } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useParams } from 'next/navigation';
@@ -630,7 +630,7 @@ function MessageBubble({ message, onButtonClick }: { message: ChatMessage; onBut
               <img src={message.videoUrl} alt="Final video" className="w-full h-full object-contain" />
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="w-14 h-14 rounded-full bg-white/20 flex items-center justify-center backdrop-blur-sm cursor-pointer hover:bg-white/30 transition-colors">
-                  <span className="text-white text-2xl ml-1">▶</span>
+                  <Play className="w-6 h-6 text-white ml-0.5" />
                 </div>
               </div>
             </div>

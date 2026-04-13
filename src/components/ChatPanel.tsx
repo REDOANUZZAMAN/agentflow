@@ -221,6 +221,26 @@ export default function ChatPanel() {
         mode: state.chatMode,
       };
 
+      // Plan mode: use batch endpoint (no stream needed for conversation)
+      if (state.chatMode === 'plan') {
+        const planRes = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(apiPayload),
+        });
+        const data = await planRes.json();
+        addMessage({
+          id: uuidv4(), role: 'assistant',
+          content: data.response || data.error || 'Something went wrong. Please try again.',
+          timestamp: new Date(),
+          buttons: data.buttons,
+        });
+        setIsSubmitting(false);
+        dispatch({ type: 'SET_AI_TYPING', payload: false });
+        return;
+      }
+
+      // Act mode: use streaming endpoint for live build
       const response = await fetch('/api/chat/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

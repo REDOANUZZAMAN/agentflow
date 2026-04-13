@@ -240,7 +240,7 @@ export async function POST(req: NextRequest) {
     // 1. Try Supabase Edge Function (Claude API proxy — runs outside China)
     if (supabaseUrl && supabaseAnonKey) {
       try {
-        const result = await callSupabaseClaudeProxy(message, history, nodes, edges, supabaseUrl, supabaseAnonKey);
+        const result = await callSupabaseClaudeProxy(message, history, nodes, edges, supabaseUrl, supabaseAnonKey, isPlanMode);
         console.log('[ok] Supabase Claude proxy succeeded');
         return NextResponse.json(result);
       } catch (proxyError: any) {
@@ -282,7 +282,7 @@ export async function POST(req: NextRequest) {
 // ─── Supabase Edge Function (Claude API Proxy) ──────────────────────
 async function callSupabaseClaudeProxy(
   message: string, history: any[], nodes: any[], edges: any[],
-  supabaseUrl: string, anonKey: string
+  supabaseUrl: string, anonKey: string, isPlanMode: boolean = false
 ) {
   const canvasContext = nodes.length > 0
     ? `\n\nCurrent canvas has ${nodes.length} node(s):\n${nodes.map((n: any) => `- ${n.id}: ${n.data.emoji} ${n.data.label} (${n.data.type})`).join('\n')}\nEdges: ${edges.map((e: any) => `${e.source} → ${e.target}`).join(', ') || 'none'}`
@@ -308,7 +308,30 @@ async function callSupabaseClaudeProxy(
     !['start_task', 'complete_task', 'fail_task', 'add_task', 'update_task'].includes(t.name)
   );
 
-  // Helper to call the proxy
+  // ─── PLAN MODE: simple batch call, no tools ───
+  if (isPlanMode) {
+    const res = await fetch(`${supabaseUrl}/functions/v1/claude-proxy`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${anonKey}` },
+      body: JSON.stringify({
+        messages, system: PLAN_MODE_SYSTEM_PROMPT,
+        model: 'claude-sonnet-4-6', max_tokens: 4096,
+      }),
+    });
+    if (!res.ok) throw new Error(`Plan proxy ${res.status}: ${await res.text()}`);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    let text = '';
+    for (const block of (data.content || [])) {
+      if (block.type === 'text') text += block.text;
+    }
+    return {
+      response: text || 'I\'m here to help you plan! Tell me more about what you\'d like to create.',
+      toolCalls: [], nodeIdMap: {}, provider: 'supabase-claude-plan',
+    };
+  }
+
+  // Helper to call the proxy (Act mode with tools)
   async function callProxy(msgs: any[]) {
     const response = await fetch(`${supabaseUrl}/functions/v1/claude-proxy`, {
       method: 'POST',

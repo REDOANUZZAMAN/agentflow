@@ -281,7 +281,10 @@ export default function ChatPanel() {
       const streamToolCalls: any[] = [];
       const streamNodeIdMap: Record<string, string> = {};
 
-      const clientDelay = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
+      // Force a browser paint + wait — guarantees React renders between dispatches
+      const clientDelay = (ms: number) => new Promise<void>(resolve => {
+        requestAnimationFrame(() => setTimeout(resolve, ms));
+      });
 
       // Queue for client-side pacing
       const toolEventQueue: any[] = [];
@@ -366,18 +369,19 @@ export default function ChatPanel() {
         processStreamedTool(tool);
 
         // CLIENT-SIDE PACING: delay AFTER processing each tool
+        // These delays are REAL pauses that the user sees — each step is visually distinct
         if (tool.name === 'create_task_list') {
-          await clientDelay(100); // Quick — just sets up the list
+          await clientDelay(600); // Let user READ the full task list before building starts
         } else if (tool.name === 'start_task') {
-          await clientDelay(300); // Let user SEE the "running" spinner
+          await clientDelay(400); // See the "running" spinner on this task
         } else if (tool.name === 'add_node' || tool.name === 'update_node' || tool.name === 'delete_node') {
-          await clientDelay(500); // Node appears/changes on canvas — satisfying pace
+          await clientDelay(600); // Node appears on canvas — satisfying pause
         } else if (tool.name === 'complete_task') {
-          await clientDelay(200); // Green checkmark appears
+          await clientDelay(350); // Green checkmark appears — user sees the tick!
         } else if (tool.name === 'connect_nodes') {
-          await clientDelay(100); // Connections are fast
+          await clientDelay(150); // Connections draw quickly
         } else {
-          await clientDelay(50); // workflow_ready, list_nodes, etc.
+          await clientDelay(80); // workflow_ready, list_nodes, etc.
         }
       }
 

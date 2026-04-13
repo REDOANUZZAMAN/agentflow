@@ -391,123 +391,255 @@ async function executeVideoGenerator(node: WorkflowNode, ctx: ExecutionContext) 
   };
 }
 
+// Helper: Call Claude to expand voiceover text to match target duration
+async function expandVoiceoverText(
+  originalText: string,
+  sceneContext: string,
+  currentDuration: number,
+  targetDuration: number,
+  ctx: ExecutionContext,
+  nodeId: string,
+): Promise<string> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!supabaseUrl || !anonKey) return originalText;
+
+  const targetWords = Math.ceil(targetDuration * 2.5); // ~2.5 words/sec
+  const currentWords = originalText.trim().split(/\s+/).length;
+
+  ctx.emit({ type: 'log', nodeId, data: {
+    message: `[brain] Asking AI to expand narration: ${currentWords} words → ~${targetWords} words (need ${targetDuration}s, got ${currentDuration.toFixed(1)}s)`,
+  }});
+
+  try {
+    const res = await fetch(`${supabaseUrl}/functions/v1/claude-proxy`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${anonKey}` },
+      body: JSON.stringify({
+        messages: [{
+          role: 'user',
+          content: `You are a narration writer. Expand this voiceover text to be exactly ~${targetWords} words long (for a ${targetDuration}-second video clip). Keep the same tone, style, and scene context. Do NOT add stage directions or descriptions — only spoken narration.
+
+Scene context: ${sceneContext}
+
+Current text (${currentWords} words, produces only ${currentDuration.toFixed(1)}s audio — too short):
+"${originalText}"
+
+Write ONLY the expanded narration text, nothing else. Target: ~${targetWords} words for ${targetDuration}s of speech.`,
+        }],
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1024,
+      }),
+    });
+    const data = await res.json();
+    const expanded = data.content?.[0]?.text?.trim();
+    if (expanded && expanded.length > originalText.length) {
+      const newWords = expanded.split(/\s+/).length;
+      ctx.emit({ type: 'log', nodeId, data: {
+        message: `[ok] AI expanded narration: ${currentWords} → ${newWords} words: "${expanded.substring(0, 100)}..."`,
+      }});
+      return expanded;
+    }
+  } catch (err: any) {
+    ctx.emit({ type: 'log', nodeId, data: {
+      message: `[warn] AI text expansion failed: ${err.message}. Using original text.`,
+    }});
+  }
+  return originalText;
+}
+
+// Helper: Generate TTS audio and upload to Cloudinary, returns { audioUrl, cloudinaryId, duration }
+async function generateAndUploadTTS(
+  text: string,
+  voice: string | undefined,
+  speed: number | undefined,
+  falModel: string,
+  isDialogueModel: boolean,
+  ctx: ExecutionContext,
+  nodeId: string,
+): Promise<{ audioUrl: string; cloudinaryId: string; duration: number }> {
+  // Build input
+  let input: any;
+  if (isDialogueModel) {
+    input = { script: [{ voice: voice || 'alloy', text }] };
+  } else {
+    input = {
+      text,
+      ...(voice ? { voice } : {}),
+      ...(speed ? { speed: Math.round(speed * 100) / 100 } : {}),
+    };
+  }
+
+  ctx.emit({ type: 'api_call', nodeId, data: { service: 'fal.ai', model: falModel, input } });
+
+  const result = await fal.subscribe(falModel, { input });
+  const resultData = (result as any).data || result;
+
+  // Extract audio URL from response
+  const audioUrl =
+    resultData?.audio?.url ||
+    resultData?.audio_url?.url ||
+    resultData?.audio_url ||
+    resultData?.audio ||
+    resultData?.output?.url ||
+    resultData?.url ||
+    (typeof resultData === 'string' ? resultData : null);
+
+  if (!audioUrl || typeof audioUrl !== 'string') {
+    throw new Error(`No audio URL in fal.ai response. Keys: ${Object.keys(resultData).join(', ')}`);
+  }
+
+  // Upload to Cloudinary to get actual duration
+  const cldResult = await uploadToCloudinary(
+    audioUrl,
+    `agentflow/${ctx.executionId}/audio`,
+    `voiceover_${Date.now()}`,
+    'video',
+  );
+
+  return {
+    audioUrl: cldResult.secure_url,
+    cloudinaryId: cldResult.public_id,
+    duration: cldResult.duration || 0,
+  };
+}
+
 async function executeVoiceoverGenerator(node: WorkflowNode, ctx: ExecutionContext) {
   initFal();
   const { text, voice, model, speed: configSpeed } = node.data.config;
-  const voiceText = text || 'Hello, welcome to the video.';
-  
-  // Determine which model to use
-  const isDialogueModel = model && model.includes('dialogue');
-  const falModel = model || FAL_MODELS.VOICE_TTS; // Default to simple TTS, not dialogue
-
-  // Auto-calculate speech speed to fit within video duration
-  // Average English speech: ~2.5 words/second at speed=1.0
-  const WORDS_PER_SEC = 2.5;
-  const wordCount = voiceText.trim().split(/\s+/).length;
-  const naturalDuration = wordCount / WORDS_PER_SEC;
-  const targetDuration = node.data.config.targetDuration || node.data.config.duration || 5; // default 5s per shot
-  let autoSpeed = 1.0;
-  if (targetDuration > 0 && naturalDuration > 0) {
-    if (naturalDuration > targetDuration) {
-      // Text too long → speed up (max 1.2x for ElevenLabs)
-      autoSpeed = Math.min(naturalDuration / targetDuration, 1.2);
-    } else if (naturalDuration < targetDuration * 0.6) {
-      // Text too short → slow down to fill more of the clip (min 0.7x)
-      // Only slow down if the audio would cover less than 60% of the clip
-      autoSpeed = Math.max(naturalDuration / targetDuration, 0.7);
-    }
-  }
-  const finalSpeed = configSpeed || (autoSpeed !== 1.0 ? autoSpeed : undefined);
-
-  ctx.emit({ type: 'log', nodeId: node.id, data: { 
-    message: `[voice] Generating voiceover via ${falModel}... Text (${wordCount} words): "${voiceText.substring(0, 100)}${voiceText.length > 100 ? '...' : ''}"` 
-  }});
-  ctx.emit({ type: 'log', nodeId: node.id, data: { 
-    message: `[timer] Natural: ~${naturalDuration.toFixed(1)}s | Target: ${targetDuration}s | Speed: ${(finalSpeed || 1.0).toFixed(2)}x${autoSpeed < 1.0 ? ' (slowed to fill clip)' : autoSpeed > 1.0 ? ' (sped up to fit)' : ''}`
-  }});
-
-  // Build input based on model type
-  let input: any;
-  if (isDialogueModel) {
-    // Dialogue model expects script array: [{ voice: "...", text: "..." }]
-    input = {
-      script: [{ voice: voice || 'alloy', text: voiceText }],
-    };
-    ctx.emit({ type: 'log', nodeId: node.id, data: { message: `[note] Using dialogue format: script array with voice "${voice || 'alloy'}"` } });
-  } else {
-    // Standard TTS: text + voice + speed
-    input = {
-      text: voiceText,
-      ...(voice ? { voice: voice } : {}),
-      ...(finalSpeed ? { speed: Math.round(finalSpeed * 100) / 100 } : {}),
-    };
-    ctx.emit({ type: 'log', nodeId: node.id, data: { message: `[note] Using TTS format: text + voice "${voice || 'default'}"${finalSpeed ? ` + speed ${finalSpeed.toFixed(2)}x` : ''}` } });
-  }
-
-  ctx.emit({ type: 'api_call', nodeId: node.id, data: { service: 'fal.ai', model: falModel, input } });
-
-  let result: any;
-  try {
-    result = await fal.subscribe(falModel, { input });
-  } catch (err: any) {
-    ctx.emit({ type: 'log', nodeId: node.id, data: { 
-      message: `[x] fal.ai voiceover FAILED. Model: ${falModel}, Input: ${JSON.stringify(input)}`,
-      error: err.message,
-      body: err.body || null,
-    }});
-    throw new Error(`Voiceover generation failed (${falModel}): ${err.message}`);
-  }
-
-  // Log raw response structure for debugging
-  const resultData = (result as any).data || result;
-  ctx.emit({ type: 'log', nodeId: node.id, data: { 
-    message: `[box] Raw response keys: ${JSON.stringify(Object.keys(resultData))}`,
-    rawKeys: Object.keys(resultData),
-  }});
-
-  // Try ALL possible audio URL locations in the response
-  const audioUrl = 
-    resultData?.audio?.url ||          // { audio: { url: "..." } }
-    resultData?.audio_url?.url ||      // { audio_url: { url: "..." } }
-    resultData?.audio_url ||           // { audio_url: "..." }
-    resultData?.audio ||               // { audio: "..." } (direct string)
-    resultData?.output?.url ||         // { output: { url: "..." } }
-    resultData?.url ||                 // { url: "..." }
-    (typeof resultData === 'string' ? resultData : null);  // direct string
-
-  if (!audioUrl || typeof audioUrl !== 'string') {
-    ctx.emit({ type: 'log', nodeId: node.id, data: { 
-      message: `[x] No audio URL found in response! Full response: ${JSON.stringify(resultData).substring(0, 500)}`,
-    }});
-    throw new Error(`Voiceover: no audio URL in fal.ai response. Response keys: ${Object.keys(resultData).join(', ')}`);
-  }
-
-  ctx.emit({ type: 'log', nodeId: node.id, data: { message: `[ok] Got audio URL: ${audioUrl.substring(0, 80)}...` } });
-  ctx.emit({ type: 'log', nodeId: node.id, data: { message: `[upload] Uploading voiceover to Cloudinary...` } });
-
-  const cldResult = await uploadToCloudinary(
-    audioUrl, 
-    `agentflow/${ctx.executionId}/audio`, 
-    `voiceover_${Date.now()}`, 
-    'video'  // Cloudinary uses 'video' resource type for audio
-  );
-  
-  ctx.emit({ type: 'asset_created', nodeId: node.id, data: { type: 'audio', url: cldResult.secure_url } });
-
-  // Include target duration and shot info for the final compiler to align audio timing
   const sceneNum = node.data.config.sceneNumber || node.data.config.scene_number || 1;
   const shotNum = node.data.config.shotNumber || node.data.config.shot_number || 1;
 
-  return { 
-    _nodeType: 'voiceover_generator', 
-    audioUrl: cldResult.secure_url, 
-    cloudinaryId: cldResult.public_id, 
-    audioDuration: cldResult.duration || undefined,
-    targetDuration: targetDuration,
+  const isDialogueModel = model && model.includes('dialogue');
+  const falModel = model || FAL_MODELS.VOICE_TTS;
+
+  // ── Step 1: Determine the REAL target duration from the matching video ──
+  // Look up the actual video output for this scene+shot
+  let videoDuration = 0;
+  for (const [, output] of ctx.nodeOutputs) {
+    if (output._nodeType === 'video_generator' &&
+        output.sceneNumber === sceneNum && output.shotNumber === shotNum) {
+      videoDuration = output.duration || 0;
+      break;
+    }
+  }
+  // Fallback to config duration
+  const targetDuration = videoDuration || node.data.config.targetDuration || node.data.config.duration || 5;
+  const MIN_COVERAGE = 0.83; // Audio must cover at least 83% of video
+  const minDuration = targetDuration * MIN_COVERAGE;
+  const maxDuration = targetDuration; // Audio must NOT exceed video duration
+  const MAX_RETRIES = 3;
+
+  ctx.emit({ type: 'log', nodeId: node.id, data: {
+    message: `[voice] Scene ${sceneNum} Shot ${shotNum} | Video: ${videoDuration || '?'}s | Target: ${targetDuration}s | Audio must be ${minDuration.toFixed(1)}–${maxDuration}s`,
+  }});
+
+  // ── Step 2: Generate with retry loop ──────────────────────────────
+  let currentText = text || 'Hello, welcome to the video.';
+  let bestResult: { audioUrl: string; cloudinaryId: string; duration: number } | null = null;
+  let totalCost = 0;
+
+  // Build scene context for AI text expansion
+  const sceneContext = node.data.config.prompt || node.data.config.description ||
+    `Scene ${sceneNum}, Shot ${shotNum} of a video project`;
+
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const wordCount = currentText.trim().split(/\s+/).length;
+    const estimatedDuration = wordCount / 2.5;
+
+    ctx.emit({ type: 'log', nodeId: node.id, data: {
+      message: `[voice] Attempt ${attempt + 1}/${MAX_RETRIES + 1}: "${currentText.substring(0, 80)}..." (${wordCount} words, ~${estimatedDuration.toFixed(1)}s est.)`,
+    }});
+
+    try {
+      const ttsResult = await generateAndUploadTTS(
+        currentText, voice, configSpeed || undefined, falModel, isDialogueModel, ctx, node.id,
+      );
+      totalCost += calcRealCost(falModel);
+
+      ctx.emit({ type: 'log', nodeId: node.id, data: {
+        message: `[timer] Generated audio: ${ttsResult.duration.toFixed(1)}s | Need: ${minDuration.toFixed(1)}–${maxDuration}s`,
+      }});
+
+      // ── Check: Audio too SHORT? ──
+      if (ttsResult.duration < minDuration && attempt < MAX_RETRIES) {
+        ctx.emit({ type: 'log', nodeId: node.id, data: {
+          message: `[warn] Audio too short (${ttsResult.duration.toFixed(1)}s < ${minDuration.toFixed(1)}s). Expanding text with AI...`,
+        }});
+
+        // Use AI to expand the text
+        currentText = await expandVoiceoverText(
+          currentText, sceneContext, ttsResult.duration, targetDuration, ctx, node.id,
+        );
+        continue; // Retry with expanded text
+      }
+
+      // ── Check: Audio too LONG? → Trim with Cloudinary ──
+      if (ttsResult.duration > maxDuration) {
+        ctx.emit({ type: 'log', nodeId: node.id, data: {
+          message: `[cut] Audio too long (${ttsResult.duration.toFixed(1)}s > ${maxDuration}s). Trimming to ${maxDuration}s...`,
+        }});
+
+        try {
+          const cld = initCloudinary();
+          const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+          // Cloudinary du_ sets max duration (trims the end)
+          const trimUrl = `https://res.cloudinary.com/${cloudName}/video/upload/du_${maxDuration.toFixed(1)}/${ttsResult.cloudinaryId}.mp3`;
+          const trimResult = await cld.uploader.upload(trimUrl, {
+            folder: `agentflow/${ctx.executionId}/audio`,
+            public_id: `voiceover_trimmed_${Date.now()}`,
+            resource_type: 'video',
+            overwrite: false,
+          });
+
+          bestResult = {
+            audioUrl: trimResult.secure_url,
+            cloudinaryId: trimResult.public_id,
+            duration: Math.min(ttsResult.duration, maxDuration),
+          };
+          ctx.emit({ type: 'log', nodeId: node.id, data: {
+            message: `[ok] Trimmed to ${maxDuration}s: ${trimResult.secure_url}`,
+          }});
+        } catch (trimErr: any) {
+          ctx.emit({ type: 'log', nodeId: node.id, data: {
+            message: `[warn] Trim failed: ${trimErr.message}. Using untrimmed audio.`,
+          }});
+          bestResult = ttsResult;
+        }
+        break;
+      }
+
+      // ── Audio duration is GOOD ──
+      bestResult = ttsResult;
+      ctx.emit({ type: 'log', nodeId: node.id, data: {
+        message: `[ok] Audio duration ${ttsResult.duration.toFixed(1)}s is within range (${minDuration.toFixed(1)}–${maxDuration}s). Perfect!`,
+      }});
+      break;
+
+    } catch (err: any) {
+      ctx.emit({ type: 'log', nodeId: node.id, data: {
+        message: `[x] TTS attempt ${attempt + 1} failed: ${err.message}`,
+      }});
+      if (attempt === MAX_RETRIES) throw err;
+    }
+  }
+
+  if (!bestResult) {
+    throw new Error(`Voiceover generation failed after ${MAX_RETRIES + 1} attempts`);
+  }
+
+  ctx.emit({ type: 'asset_created', nodeId: node.id, data: { type: 'audio', url: bestResult.audioUrl } });
+
+  return {
+    _nodeType: 'voiceover_generator',
+    audioUrl: bestResult.audioUrl,
+    cloudinaryId: bestResult.cloudinaryId,
+    audioDuration: bestResult.duration,
+    targetDuration,
     sceneNumber: sceneNum,
     shotNumber: shotNum,
     model: falModel,
-    cost: calcRealCost(falModel),
+    cost: totalCost || calcRealCost(falModel),
   };
 }
 

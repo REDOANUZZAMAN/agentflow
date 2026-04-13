@@ -258,26 +258,30 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        // Smart grid position calculator — uses shot-based column layout
+        // Smart grid position calculator — column-based layout
         const COL_W = 250;
         const ROW_H = 160;
         const GRID_START_X = 100;
+        let plannedShotCount = 0; // Set from task list, used for centering
 
-        // Helper: count total shot columns (based on photo_generators as reference)
-        function getMaxShotCols(): number {
+        // Count PLANNED shot columns from task list (works even before shots are added)
+        function getPlannedCols(): number {
+          if (plannedShotCount > 0) return plannedShotCount;
+          // Fallback: count already-created shots
           const existingAddNodes = allToolCalls.filter(c => c.name === 'add_node' && c.result && !c.result.duplicate && !c.result.rejected);
           const photoCount = existingAddNodes.filter(c => c.result?.type === 'photo_generator').length
             + (nodes || []).filter((n: any) => n.data?.type === 'photo_generator').length;
-          const videoCount = existingAddNodes.filter(c => ['video_generator', 'video_gen'].includes(c.result?.type)).length
-            + (nodes || []).filter((n: any) => ['video_generator', 'video_gen'].includes(n.data?.type)).length;
-          return Math.max(photoCount, videoCount, 1);
+          return Math.max(photoCount, 1);
         }
 
-        // Center X for single nodes (trigger, orchestrator, compiler)
+        // Center X for single-row nodes (trigger, orchestrator, compiler)
         function centerX(): number {
-          const cols = getMaxShotCols();
+          const cols = getPlannedCols();
           return GRID_START_X + Math.floor((cols - 1) / 2) * COL_W;
         }
+
+        // Track node IDs that need repositioning after all shots are placed
+        const deferredCenterNodes: string[] = [];
 
         function calcPosition(type: string, config: any): { x: number; y: number } {
           const existingAddNodes = allToolCalls.filter(c => c.name === 'add_node' && c.result && !c.result.duplicate && !c.result.rejected);
@@ -290,7 +294,11 @@ export async function POST(req: NextRequest) {
               return { x: centerX(), y: 0 };
             case 'element_reference': {
               const elemIdx = existingAddNodes.filter(c => c.result?.type === 'element_reference').length + existingCanvasOfType;
-              return { x: GRID_START_X + elemIdx * COL_W, y: ROW_H };
+              // Center elements over the shot columns
+              const cols = getPlannedCols();
+              const elemCount = existingAddNodes.filter(c => c.result?.type === 'element_reference').length + existingCanvasOfType + 1;
+              const elemStartX = GRID_START_X + Math.floor((cols - elemCount) / 2) * COL_W;
+              return { x: Math.max(GRID_START_X, elemStartX) + elemIdx * COL_W, y: ROW_H };
             }
             case 'photo_generator':
             case 'image_gen': {
@@ -383,6 +391,17 @@ export async function POST(req: NextRequest) {
             case 'create_task_list':
               taskList = (inp.tasks as any[]) || [];
               plannedTaskCount = taskList.length;
+              // Extract planned shot count from task titles for accurate centering
+              // Count tasks that mention "photo" or "shot N" pattern (each shot = 1 column)
+              const photoTasks = taskList.filter((t: any) => {
+                const title = (t.title || '').toLowerCase();
+                return title.includes('photo') || title.includes('image gen');
+              });
+              const videoTasks = taskList.filter((t: any) => {
+                const title = (t.title || '').toLowerCase();
+                return title.includes('video') && !title.includes('final video') && !title.includes('compiler');
+              });
+              plannedShotCount = Math.max(photoTasks.length, videoTasks.length, 1);
               result = { success: true, tasks: taskList };
               break;
             case 'workflow_ready':

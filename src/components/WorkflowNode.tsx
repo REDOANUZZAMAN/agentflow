@@ -2,21 +2,10 @@
 
 import React from 'react';
 import { Handle, Position, type NodeProps, type Node } from '@xyflow/react';
-import { CheckCircle2, XCircle, Loader2, HelpCircle } from 'lucide-react';
+import { CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import { NodeIcon, getNodeColor } from '@/lib/node-icons';
 
-// Define node data type
-type WorkflowNodeData = Node<{
-  type: string;
-  label: string;
-  emoji: string;
-  config: Record<string, unknown>;
-  status?: 'idle' | 'running' | 'success' | 'error';
-  error?: string;
-  output?: unknown;
-}>;
-
-// Compact n8n-style node with horizontal (left→right) connections
+// n8n-style square node: large icon box + label below + horizontal handles
 export default function WorkflowNodeComponent(props: NodeProps) {
   const data = props.data || {};
   const status = (data.status as string) || 'idle';
@@ -29,72 +18,90 @@ export default function WorkflowNodeComponent(props: NodeProps) {
   const nodeColor = getNodeColor(type);
   const isTrigger = type.includes('trigger');
 
-  // Status-specific border
-  const statusBorder: Record<string, string> = {
-    idle: 'border-[var(--border)]',
-    running: 'border-[var(--primary)] shadow-[0_0_12px_rgba(99,102,241,0.4)]',
-    success: 'border-emerald-500/60',
-    error: 'border-red-500/60',
-  };
-
-  // Status badge
-  const statusBadge = () => {
-    if (status === 'running') return <Loader2 className="w-3 h-3 text-[var(--primary)] animate-spin" />;
-    if (status === 'success') return <CheckCircle2 className="w-3 h-3 text-emerald-400" />;
-    if (status === 'error') return <XCircle className="w-3 h-3 text-red-400" />;
-    return null;
+  // Status ring colors
+  const statusRing: Record<string, string> = {
+    idle: '',
+    running: 'ring-2 ring-[var(--primary)] ring-offset-2 ring-offset-[var(--background)]',
+    success: 'ring-2 ring-emerald-500 ring-offset-2 ring-offset-[var(--background)]',
+    error: 'ring-2 ring-red-500 ring-offset-2 ring-offset-[var(--background)]',
   };
 
   const subtitle = getNodeSubtitle(type, config);
 
   return (
-    <div
-      className={`
-        node-appear relative flex items-center gap-2.5
-        bg-[var(--card)] rounded-xl border ${statusBorder[status] || statusBorder.idle}
-        ${selected ? '!border-[var(--primary)] ring-2 ring-[var(--primary)]/20' : ''}
-        shadow-md hover:shadow-lg transition-all duration-150
-        px-3 py-2.5 min-w-[140px] max-w-[200px]
-      `}
-    >
+    <div className="node-appear flex flex-col items-center gap-1.5 group" style={{ width: '100px' }}>
       {/* Left handle (input) — not for triggers */}
       {!isTrigger && (
         <Handle
           type="target"
           position={Position.Left}
-          className="!w-2.5 !h-2.5 !bg-[var(--muted-foreground)] !border-2 !border-[var(--card)] !-left-[6px]"
+          className="!w-2 !h-2 !bg-[var(--muted-foreground)] !border-[1.5px] !border-[var(--background)] !-left-[5px]"
+          style={{ top: '34px' }}
         />
       )}
 
-      {/* Colored icon */}
-      <div className={`flex-shrink-0 w-9 h-9 rounded-lg ${nodeColor.bg} ring-1 ${nodeColor.ring} flex items-center justify-center`}>
-        <NodeIcon type={type} className={`w-4.5 h-4.5 ${nodeColor.icon}`} />
-      </div>
+      {/* Square icon box */}
+      <div
+        className={`
+          relative w-[64px] h-[64px] rounded-xl flex items-center justify-center
+          bg-[var(--card)] border-2 border-[var(--border)]
+          ${selected ? '!border-[var(--primary)] shadow-[0_0_0_2px_rgba(99,102,241,0.2)]' : ''}
+          ${statusRing[status] || ''}
+          shadow-md hover:shadow-lg transition-all duration-150 cursor-pointer
+        `}
+      >
+        {/* Colored icon background */}
+        <div className={`w-10 h-10 rounded-lg ${nodeColor.bg} flex items-center justify-center`}>
+          <NodeIcon type={type} className={`w-5 h-5 ${nodeColor.icon}`} />
+        </div>
 
-      {/* Label + subtitle */}
-      <div className="flex-1 min-w-0">
-        <h3 className="text-[12px] font-semibold text-[var(--foreground)] truncate leading-tight">{label}</h3>
-        {subtitle && (
-          <p className="text-[10px] text-[var(--muted-foreground)] truncate leading-tight mt-0.5">{subtitle}</p>
+        {/* Status badge - top right corner */}
+        {status === 'running' && (
+          <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[var(--card)] flex items-center justify-center border border-[var(--border)]">
+            <Loader2 className="w-2.5 h-2.5 text-[var(--primary)] animate-spin" />
+          </div>
+        )}
+        {status === 'success' && (
+          <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 flex items-center justify-center">
+            <CheckCircle2 className="w-3 h-3 text-white" />
+          </div>
+        )}
+        {status === 'error' && (
+          <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 flex items-center justify-center">
+            <XCircle className="w-3 h-3 text-white" />
+          </div>
+        )}
+
+        {/* Green trigger indicator */}
+        {isTrigger && (
+          <div className="absolute -left-1 top-1/2 -translate-y-1/2 w-1.5 h-6 rounded-full bg-emerald-500" />
         )}
       </div>
 
-      {/* Status badge */}
-      {statusBadge() && (
-        <div className="flex-shrink-0">{statusBadge()}</div>
-      )}
+      {/* Label below the box */}
+      <div className="text-center w-full px-0.5">
+        <p className="text-[11px] font-semibold text-[var(--foreground)] truncate leading-tight">
+          {label}
+        </p>
+        {subtitle && (
+          <p className="text-[9px] text-[var(--muted-foreground)] truncate leading-tight mt-0.5">
+            {subtitle}
+          </p>
+        )}
+      </div>
 
       {/* Right handle (output) */}
       <Handle
         type="source"
         position={Position.Right}
-        className="!w-2.5 !h-2.5 !bg-[var(--primary)] !border-2 !border-[var(--card)] !-right-[6px]"
+        className="!w-2 !h-2 !bg-[var(--primary)] !border-[1.5px] !border-[var(--background)] !-right-[5px]"
+        style={{ top: '34px' }}
       />
 
-      {/* Error tooltip */}
+      {/* Error tooltip on hover */}
       {error && (
-        <div className="absolute left-0 -bottom-6 right-0 text-center">
-          <span className="inline-block px-2 py-0.5 bg-red-500/90 text-white text-[9px] rounded-md truncate max-w-[180px]">
+        <div className="absolute -bottom-7 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+          <span className="inline-block px-2 py-0.5 bg-red-500/90 text-white text-[8px] rounded-md whitespace-nowrap max-w-[140px] truncate">
             {error}
           </span>
         </div>
@@ -108,35 +115,37 @@ function getNodeSubtitle(type: string, config: Record<string, unknown>): string 
     case 'schedule_trigger':
       return config.schedule ? `${config.schedule}` : '';
     case 'manual_trigger':
-      return 'Click to run';
+      return '';
     case 'webhook_trigger':
-      return config.url ? `${config.url}` : '';
+      return config.url ? 'Webhook URL' : '';
     case 'claude_chat':
-      return config.prompt ? `${(config.prompt as string).slice(0, 25)}...` : '';
+      return config.prompt ? `${(config.prompt as string).slice(0, 18)}...` : '';
     case 'send_email':
-      return config.to ? `To: ${config.to}` : '';
+      return config.to ? `To: ${(config.to as string).slice(0, 15)}` : '';
     case 'post_x':
-      return 'Twitter/X';
+      return '';
     case 'post_instagram':
-      return 'Instagram';
+      return '';
     case 'post_linkedin':
-      return 'LinkedIn';
+      return '';
     case 'post_tiktok':
-      return 'TikTok';
+      return '';
     case 'http_request':
-      return config.url ? `${config.method || 'GET'} ...` : '';
+      return config.method ? `${config.method}` : '';
     case 'web_search':
-      return config.query ? `"${(config.query as string).slice(0, 20)}"` : '';
+      return config.query ? `"${(config.query as string).slice(0, 14)}"` : '';
     case 'final_video_compiler':
       return config.transition ? `${config.transition}` : '';
     case 'project_orchestrator':
-      return config.projectName ? `${(config.projectName as string).slice(0, 20)}` : '';
+      return config.projectName ? `${(config.projectName as string).slice(0, 15)}` : '';
     case 'element_reference':
       return config.elementName ? `${config.elementName}` : '';
     case 'photo_generator':
+      return 'Photo';
     case 'video_generator':
+      return 'Video';
     case 'voiceover_generator':
-      return config.prompt ? `${(config.prompt as string).slice(0, 22)}...` : '';
+      return 'Voiceover';
     default:
       return '';
   }

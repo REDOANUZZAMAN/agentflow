@@ -426,7 +426,7 @@ export function createNode(type: NodeType, config: Record<string, unknown> = {},
   return {
     id,
     type: 'workflowNode',
-    position: position || { x: 80 + (nodeCounter - 1) * 220, y: 150 },
+    position: position || { x: 80 + (nodeCounter - 1) * 160, y: 150 },
     data: {
       type,
       label: meta.label,
@@ -479,7 +479,7 @@ export function autoLayout(nodes: WorkflowNode[], edges: WorkflowEdge[]): Workfl
 
   if (!isVideoPipeline) {
     // Horizontal layout (left-to-right) for non-pipeline workflows
-    const NODE_GAP_X = 220; // horizontal gap between nodes
+    const NODE_GAP_X = 160; // horizontal gap between nodes (n8n-style compact)
     const hasIncoming = new Set(edges.map(e => e.target));
     const roots = nodes.filter(n => !hasIncoming.has(n.id));
     const visited = new Set<string>();

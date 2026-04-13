@@ -1,11 +1,11 @@
 'use client';
 
 import React from 'react';
-import { Handle, Position, type NodeProps, type Node } from '@xyflow/react';
+import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import { NodeIcon, getNodeColor } from '@/lib/node-icons';
 
-// n8n-style square node: large icon box + label below + horizontal handles
+// n8n-style square node: icon box with handles attached to it + label below
 export default function WorkflowNodeComponent(props: NodeProps) {
   const data = props.data || {};
   const status = (data.status as string) || 'idle';
@@ -30,17 +30,7 @@ export default function WorkflowNodeComponent(props: NodeProps) {
 
   return (
     <div className="node-appear flex flex-col items-center gap-1.5 group" style={{ width: '100px' }}>
-      {/* Left handle (input) — not for triggers */}
-      {!isTrigger && (
-        <Handle
-          type="target"
-          position={Position.Left}
-          className="!w-2 !h-2 !bg-[var(--muted-foreground)] !border-[1.5px] !border-[var(--background)] !-left-[5px]"
-          style={{ top: '34px' }}
-        />
-      )}
-
-      {/* Square icon box */}
+      {/* Icon box — handles are INSIDE this so they attach to the box edges */}
       <div
         className={`
           relative w-[64px] h-[64px] rounded-xl flex items-center justify-center
@@ -55,19 +45,37 @@ export default function WorkflowNodeComponent(props: NodeProps) {
           <NodeIcon type={type} className={`w-5 h-5 ${nodeColor.icon}`} />
         </div>
 
+        {/* LEFT handle (input) — centered vertically on the icon box */}
+        {!isTrigger && (
+          <Handle
+            type="target"
+            position={Position.Left}
+            className="!w-2.5 !h-2.5 !bg-[var(--muted-foreground)] !border-2 !border-[var(--background)] !rounded-full"
+            style={{ left: '-6px', top: '50%', transform: 'translateY(-50%)' }}
+          />
+        )}
+
+        {/* RIGHT handle (output) — centered vertically on the icon box */}
+        <Handle
+          type="source"
+          position={Position.Right}
+          className="!w-2.5 !h-2.5 !bg-[var(--primary)] !border-2 !border-[var(--background)] !rounded-full"
+          style={{ right: '-6px', top: '50%', transform: 'translateY(-50%)' }}
+        />
+
         {/* Status badge - top right corner */}
         {status === 'running' && (
-          <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[var(--card)] flex items-center justify-center border border-[var(--border)]">
+          <div className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-[var(--card)] flex items-center justify-center border border-[var(--border)]">
             <Loader2 className="w-2.5 h-2.5 text-[var(--primary)] animate-spin" />
           </div>
         )}
         {status === 'success' && (
-          <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 flex items-center justify-center">
+          <div className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-emerald-500 flex items-center justify-center">
             <CheckCircle2 className="w-3 h-3 text-white" />
           </div>
         )}
         {status === 'error' && (
-          <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 flex items-center justify-center">
+          <div className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-red-500 flex items-center justify-center">
             <XCircle className="w-3 h-3 text-white" />
           </div>
         )}
@@ -89,14 +97,6 @@ export default function WorkflowNodeComponent(props: NodeProps) {
           </p>
         )}
       </div>
-
-      {/* Right handle (output) */}
-      <Handle
-        type="source"
-        position={Position.Right}
-        className="!w-2 !h-2 !bg-[var(--primary)] !border-[1.5px] !border-[var(--background)] !-right-[5px]"
-        style={{ top: '34px' }}
-      />
 
       {/* Error tooltip on hover */}
       {error && (
@@ -123,11 +123,8 @@ function getNodeSubtitle(type: string, config: Record<string, unknown>): string 
     case 'send_email':
       return config.to ? `To: ${(config.to as string).slice(0, 15)}` : '';
     case 'post_x':
-      return '';
     case 'post_instagram':
-      return '';
     case 'post_linkedin':
-      return '';
     case 'post_tiktok':
       return '';
     case 'http_request':

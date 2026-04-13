@@ -77,7 +77,7 @@ function WorkflowCanvasInner() {
       setRfEdges(state.edges.map((e) => ({
         id: e.id, source: e.source, target: e.target,
         sourceHandle: e.sourceHandle, targetHandle: e.targetHandle,
-        type: 'smoothstep',
+        type: 'default',
         animated: false,
         style: { stroke: '#6366f1', strokeWidth: 2 },
       })));
@@ -104,7 +104,7 @@ function WorkflowCanvasInner() {
       const edge = createEdge(connection.source, connection.target);
       dispatch({ type: 'ADD_EDGE', payload: edge });
       setRfEdges((eds) => addEdge({
-        ...connection, id: edge.id, type: 'smoothstep', animated: false,
+        ...connection, id: edge.id, type: 'default', animated: false,
         style: { stroke: '#6366f1', strokeWidth: 2 },
       }, eds));
     }
@@ -335,8 +335,8 @@ function WorkflowCanvasInner() {
         className="bg-[var(--background)]"
         proOptions={{ hideAttribution: true }}
         connectionLineStyle={{ stroke: '#6366f1', strokeWidth: 2 }}
-        defaultEdgeOptions={{ type: 'smoothstep', style: { stroke: '#6366f1', strokeWidth: 2 }, animated: false }}
-        connectionLineType={'smoothstep' as any}
+        defaultEdgeOptions={{ type: 'default', style: { stroke: '#6366f1', strokeWidth: 2 }, animated: false }}
+        connectionLineType={'default' as any}
         deleteKeyCode={null}
         panOnDrag
         selectionKeyCode="Shift"

@@ -312,6 +312,8 @@ export default function ChatPanel() {
         }
         if (data.workflowName) dispatch({ type: 'SET_WORKFLOW_META', payload: { name: data.workflowName, emoji: data.workflowEmoji } });
         addMessage({ id: uuidv4(), role: 'assistant', content: data.response, timestamp: new Date(), toolCalls: data.toolCalls?.map((tc: any) => ({ id: tc.id, name: tc.name, input: tc.input, status: 'done' as const })), buttons: data.buttons });
+        // Auto-layout after batch tool processing
+        setTimeout(() => dispatch({ type: 'AUTO_LAYOUT' }), 600);
         setIsSubmitting(false);
         dispatch({ type: 'SET_AI_TYPING', payload: false });
         return;
@@ -440,6 +442,8 @@ export default function ChatPanel() {
       };
       addMessage(errorMsg);
     } finally {
+      // Auto-layout all nodes using dagre for clean visual structure
+      dispatch({ type: 'AUTO_LAYOUT' });
       dispatch({ type: 'SET_AI_TYPING', payload: false });
       setIsSubmitting(false);
     }

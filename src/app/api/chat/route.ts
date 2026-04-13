@@ -184,7 +184,7 @@ NEVER ASK PERMISSION FOR: picking defaults, auto-filling configs, layout decisio
 ALWAYS CONFIRM BEFORE: posting to social media, sending emails/messages, costs over $5, deleting anything
 
 ## Position Guide
-Place nodes horizontally (left-to-right) with 160px gaps. Start at x:80, y:150. Each subsequent node goes at x + 160, same y.
+You do NOT need to provide position coordinates for nodes — the canvas auto-layouts using dagre after you add all nodes and edges. Just focus on creating the right nodes with correct configs and connecting them properly. The system will arrange them in a beautiful left-to-right graph layout automatically.
 
 Remember: The user can SEE the canvas updating in real-time as you use your tools. Make it feel like magic! [sparkle]`;
 
@@ -861,8 +861,7 @@ async function callClaudeAPI(message: string, history: any[], nodes: any[], edge
             const meta = getNodeMeta(nodeType);
             const nodeId = `node_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
             const position = (toolInput.position as { x: number; y: number }) || {
-              x: 300,
-              y: 80 + (nodes.length + toolCalls.filter((t: any) => t.name === 'add_node').length) * 160,
+              x: 80 + (nodes.length + toolCalls.filter((t: any) => t.name === 'add_node').length) * 160,
               y: 150,
             };
             

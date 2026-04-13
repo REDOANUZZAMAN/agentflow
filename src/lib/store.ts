@@ -5,6 +5,7 @@
 import { ChatMessage, ExecutionEvent, WorkflowNode, WorkflowEdge, NodeType, getNodeMeta, Task, TaskList } from './types';
 import type { TerminalLogEntry } from '@/components/TerminalPanel';
 import { applyDefaults } from './node-defaults';
+import dagre from 'dagre';
 
 // History snapshot for undo/redo
 interface HistorySnapshot {
@@ -125,6 +126,7 @@ export type Action =
   | { type: 'TOGGLE_TASK_LIST'; payload?: boolean }
   | { type: 'CLEAR_TASK_LIST' }
   | { type: 'AUTO_FIX_DEFAULTS' }
+  | { type: 'AUTO_LAYOUT' }
   // Terminal actions
   | { type: 'ADD_TERMINAL_LOG'; payload: TerminalLogEntry }
   | { type: 'CLEAR_TERMINAL_LOGS' }
@@ -390,6 +392,13 @@ export function reducer(state: AppState, action: Action): AppState {
         })),
       };
 
+    // Auto-layout: use dagre for beautiful graph layout
+    case 'AUTO_LAYOUT': {
+      if (state.nodes.length === 0) return state;
+      const layouted = dagreLayout(state.nodes, state.edges);
+      return { ...state, nodes: layouted };
+    }
+
     // Terminal actions
     case 'ADD_TERMINAL_LOG':
       if (state.terminalLogs.some(l => l.id === action.payload.id)) return state;
@@ -445,104 +454,62 @@ export function createEdge(source: string, target: string): WorkflowEdge {
   };
 }
 
-// Smart grid-based auto-layout for video pipeline workflows
-export function autoLayout(nodes: WorkflowNode[], edges: WorkflowEdge[]): WorkflowNode[] {
+// ─── Dagre-based auto-layout ─────────────────────────────────
+// Uses dagre to compute optimal graph layout (left-to-right)
+// Handles linear chains, branches, and complex DAGs beautifully
+const NODE_WIDTH = 100;  // matches our n8n-style node width
+const NODE_HEIGHT = 90;  // icon box (64) + gap (6) + label (20)
+
+export function dagreLayout(nodes: WorkflowNode[], edges: WorkflowEdge[]): WorkflowNode[] {
   if (nodes.length === 0) return nodes;
-
-  const COL_W = 280;
-  const ROW_H = 180;
-
-  // Categorize nodes
-  const triggers: WorkflowNode[] = [];
-  const elements: WorkflowNode[] = [];
-  const photos: WorkflowNode[] = [];
-  const videos: WorkflowNode[] = [];
-  const voiceovers: WorkflowNode[] = [];
-  const orchestrators: WorkflowNode[] = [];
-  const compilers: WorkflowNode[] = [];
-  const others: WorkflowNode[] = [];
-
-  for (const n of nodes) {
-    const t = n.data.type;
-    if (['manual_trigger', 'schedule_trigger', 'webhook_trigger'].includes(t)) triggers.push(n);
-    else if (t === 'element_reference') elements.push(n);
-    else if (t === 'photo_generator' || t === 'image_gen') photos.push(n);
-    else if (t === 'video_generator' || t === 'video_gen') videos.push(n);
-    else if (t === 'voiceover_generator' || t === 'voice_gen') voiceovers.push(n);
-    else if (t === 'project_orchestrator') orchestrators.push(n);
-    else if (t === 'final_video_compiler') compilers.push(n);
-    else others.push(n);
+  if (edges.length === 0) {
+    // No edges — just lay out horizontally
+    return nodes.map((n, i) => ({ ...n, position: { x: 80 + i * 160, y: 100 } }));
   }
 
-  // Check if this is a video pipeline workflow
-  const isVideoPipeline = photos.length > 0 || videos.length > 0;
+  const g = new dagre.graphlib.Graph();
+  g.setDefaultEdgeLabel(() => ({}));
 
-  if (!isVideoPipeline) {
-    // Horizontal layout (left-to-right) for non-pipeline workflows
-    const NODE_GAP_X = 160; // horizontal gap between nodes (n8n-style compact)
-    const hasIncoming = new Set(edges.map(e => e.target));
-    const roots = nodes.filter(n => !hasIncoming.has(n.id));
-    const visited = new Set<string>();
-    const ordered: WorkflowNode[] = [];
-    const queue = [...roots];
-    while (queue.length > 0) {
-      const node = queue.shift()!;
-      if (visited.has(node.id)) continue;
-      visited.add(node.id);
-      ordered.push(node);
-      const children = edges.filter(e => e.source === node.id).map(e => nodes.find(n => n.id === e.target)).filter(Boolean) as WorkflowNode[];
-      queue.push(...children);
+  // LR = left-to-right, nodesep = vertical gap, ranksep = horizontal gap between ranks
+  g.setGraph({
+    rankdir: 'LR',
+    nodesep: 60,   // vertical spacing between nodes in same rank
+    ranksep: 120,  // horizontal spacing between ranks
+    marginx: 40,
+    marginy: 40,
+  });
+
+  // Add nodes
+  for (const node of nodes) {
+    g.setNode(node.id, { width: NODE_WIDTH, height: NODE_HEIGHT });
+  }
+
+  // Add edges
+  for (const edge of edges) {
+    // Only add if both source and target exist
+    if (nodes.some(n => n.id === edge.source) && nodes.some(n => n.id === edge.target)) {
+      g.setEdge(edge.source, edge.target);
     }
-    for (const n of nodes) { if (!visited.has(n.id)) ordered.push(n); }
-    return ordered.map((node, i) => ({ ...node, position: { x: 80 + i * NODE_GAP_X, y: 150 } }));
   }
 
-  // Video pipeline grid layout
-  const sortByShot = (a: WorkflowNode, b: WorkflowNode) =>
-    ((a.data.config as any)?.shotNumber || 0) - ((b.data.config as any)?.shotNumber || 0);
-  photos.sort(sortByShot);
-  videos.sort(sortByShot);
-  voiceovers.sort(sortByShot);
+  // Run dagre layout
+  dagre.layout(g);
 
-  const maxCols = Math.max(elements.length, photos.length, videos.length, voiceovers.length, 1);
-  const centerX = 150 + ((maxCols - 1) * COL_W) / 2;
-
-  const result: WorkflowNode[] = [];
-
-  // Row 0: Triggers (centered)
-  for (const n of triggers) {
-    result.push({ ...n, position: { x: centerX, y: 0 } });
-  }
-  // Row 1: Element references
-  for (let i = 0; i < elements.length; i++) {
-    result.push({ ...elements[i], position: { x: 150 + i * COL_W, y: ROW_H } });
-  }
-  // Row 2: Photos (by shot number)
-  for (let i = 0; i < photos.length; i++) {
-    result.push({ ...photos[i], position: { x: 150 + i * COL_W, y: 2 * ROW_H } });
-  }
-  // Row 3: Videos
-  for (let i = 0; i < videos.length; i++) {
-    result.push({ ...videos[i], position: { x: 150 + i * COL_W, y: 3 * ROW_H } });
-  }
-  // Row 4: Voiceovers
-  for (let i = 0; i < voiceovers.length; i++) {
-    result.push({ ...voiceovers[i], position: { x: 150 + i * COL_W, y: 4 * ROW_H } });
-  }
-  // Row 5: Orchestrator
-  for (const n of orchestrators) {
-    result.push({ ...n, position: { x: centerX, y: 5 * ROW_H } });
-  }
-  // Row 6: Compiler
-  for (const n of compilers) {
-    result.push({ ...n, position: { x: centerX, y: 6 * ROW_H } });
-  }
-  // Remaining nodes below
-  let othersY = 7 * ROW_H;
-  for (const n of others) {
-    result.push({ ...n, position: { x: centerX, y: othersY } });
-    othersY += 150;
-  }
-
-  return result;
+  // Apply positions back to nodes (dagre returns center positions, React Flow uses top-left)
+  return nodes.map((node) => {
+    const pos = g.node(node.id);
+    if (pos) {
+      return {
+        ...node,
+        position: {
+          x: pos.x - NODE_WIDTH / 2,
+          y: pos.y - NODE_HEIGHT / 2,
+        },
+      };
+    }
+    return node;
+  });
 }
+
+// Alias for backward compatibility
+export const autoLayout = dagreLayout;

@@ -210,6 +210,8 @@ export default function ChatPanel() {
     addMessage(userMsg);
     dispatch({ type: 'SET_AI_TYPING', payload: true });
 
+    let streamHasAddNodes = false; // Outer scope — used in finally to skip auto-layout
+
     try {
       const apiPayload = {
         message: state.confirmedPlan && state.chatMode === 'act'
@@ -270,13 +272,19 @@ export default function ChatPanel() {
         return;
       }
 
-      // Stream SSE events
+      // Stream SSE events with CLIENT-SIDE PACING
+      // (Server sends all events at once; Vercel buffers SSE. So we queue + pace on the client.)
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
       let streamText = '';
       const streamToolCalls: any[] = [];
       const streamNodeIdMap: Record<string, string> = {};
+
+      const clientDelay = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
+
+      // Queue for client-side pacing
+      const toolEventQueue: any[] = [];
 
       const processStreamedTool = (tool: any) => {
         if (tool.name === 'add_node' && tool.result) {
@@ -321,6 +329,7 @@ export default function ChatPanel() {
         streamToolCalls.push(tool);
       };
 
+      // Read the ENTIRE SSE stream first, collecting all events into the queue
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -334,7 +343,7 @@ export default function ChatPanel() {
             try {
               const data = JSON.parse(line.slice(6));
               switch (currentEvent) {
-                case 'tool': processStreamedTool(data); break;
+                case 'tool': toolEventQueue.push(data); break;
                 case 'text': streamText = data.content || ''; break;
                 case 'status': break;
                 case 'done': streamText = data.text || streamText; break;
@@ -343,6 +352,32 @@ export default function ChatPanel() {
             } catch (e) { if (currentEvent === 'error') throw e; }
             currentEvent = '';
           } else if (line === '') { currentEvent = ''; }
+        }
+      }
+
+      // Now process the queued tool events ONE BY ONE with client-side pacing
+      for (let i = 0; i < toolEventQueue.length; i++) {
+        const tool = toolEventQueue[i];
+        
+        // Track if this is an add_node for layout decisions
+        if (tool.name === 'add_node') streamHasAddNodes = true;
+
+        // Process the tool (dispatches to store)
+        processStreamedTool(tool);
+
+        // CLIENT-SIDE PACING: delay AFTER processing each tool
+        if (tool.name === 'create_task_list') {
+          await clientDelay(100); // Quick — just sets up the list
+        } else if (tool.name === 'start_task') {
+          await clientDelay(300); // Let user SEE the "running" spinner
+        } else if (tool.name === 'add_node' || tool.name === 'update_node' || tool.name === 'delete_node') {
+          await clientDelay(500); // Node appears/changes on canvas — satisfying pace
+        } else if (tool.name === 'complete_task') {
+          await clientDelay(200); // Green checkmark appears
+        } else if (tool.name === 'connect_nodes') {
+          await clientDelay(100); // Connections are fast
+        } else {
+          await clientDelay(50); // workflow_ready, list_nodes, etc.
         }
       }
 
@@ -363,7 +398,10 @@ export default function ChatPanel() {
     } catch (error) {
       addMessage({ id: uuidv4(), role: 'assistant', content: "Oops, something went wrong on my end. Could you try again? If the problem persists, check that your API key is set up correctly in `.env.local`.", timestamp: new Date() });
     } finally {
-      dispatch({ type: 'AUTO_LAYOUT' });
+      // Only auto-layout if we didn't get add_node calls (server already provides grid positions)
+      if (!streamHasAddNodes) {
+        dispatch({ type: 'AUTO_LAYOUT' });
+      }
       dispatch({ type: 'SET_AI_TYPING', payload: false });
       setIsSubmitting(false);
     }

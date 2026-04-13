@@ -3,7 +3,7 @@
 import React from 'react';
 import { Handle, Position, type NodeProps, type Node } from '@xyflow/react';
 import { CheckCircle2, XCircle, Loader2, HelpCircle } from 'lucide-react';
-import { NodeIcon } from '@/lib/node-icons';
+import { NodeIcon, getNodeColor } from '@/lib/node-icons';
 
 // Define node data type
 type WorkflowNodeData = Node<{
@@ -35,40 +35,8 @@ export default function WorkflowNodeComponent(props: NodeProps) {
     error: 'border-[var(--destructive)]',
   };
 
-  const categoryColors: Record<string, string> = {
-    manual_trigger: 'from-yellow-500/20 to-orange-500/20',
-    schedule_trigger: 'from-yellow-500/20 to-orange-500/20',
-    webhook_trigger: 'from-yellow-500/20 to-orange-500/20',
-    claude_chat: 'from-purple-500/20 to-indigo-500/20',
-    image_gen: 'from-pink-500/20 to-purple-500/20',
-    video_gen: 'from-pink-500/20 to-purple-500/20',
-    voice_gen: 'from-pink-500/20 to-purple-500/20',
-    post_x: 'from-blue-500/20 to-cyan-500/20',
-    post_instagram: 'from-pink-500/20 to-rose-500/20',
-    post_linkedin: 'from-blue-500/20 to-indigo-500/20',
-    post_tiktok: 'from-red-500/20 to-pink-500/20',
-    send_email: 'from-green-500/20 to-emerald-500/20',
-    send_telegram: 'from-blue-500/20 to-sky-500/20',
-    http_request: 'from-orange-500/20 to-amber-500/20',
-    web_search: 'from-teal-500/20 to-cyan-500/20',
-    web_scraper: 'from-gray-500/20 to-zinc-500/20',
-    file_read: 'from-amber-500/20 to-yellow-500/20',
-    file_write: 'from-amber-500/20 to-yellow-500/20',
-    file_generate: 'from-amber-500/20 to-yellow-500/20',
-    if_else: 'from-violet-500/20 to-purple-500/20',
-    loop: 'from-violet-500/20 to-purple-500/20',
-    wait: 'from-gray-500/20 to-slate-500/20',
-    // Video Pipeline
-    script_parser: 'from-cyan-500/20 to-teal-500/20',
-    element_reference: 'from-fuchsia-500/20 to-pink-500/20',
-    photo_generator: 'from-rose-500/20 to-orange-500/20',
-    video_generator: 'from-red-500/20 to-amber-500/20',
-    voiceover_generator: 'from-sky-500/20 to-blue-500/20',
-    project_orchestrator: 'from-emerald-500/20 to-cyan-500/20',
-    final_video_compiler: 'from-rose-500/20 to-red-500/20',
-  };
-
-  const bgGradient = categoryColors[type] || 'from-gray-500/20 to-zinc-500/20';
+  const nodeColor = getNodeColor(type);
+  const bgGradient = nodeColor.gradient;
   const isTrigger = type.includes('trigger');
 
   return (
@@ -92,7 +60,7 @@ export default function WorkflowNodeComponent(props: NodeProps) {
       {/* Node content */}
       <div className={`bg-gradient-to-br ${bgGradient} rounded-t-[10px] px-4 py-3`}>
         <div className="flex items-center gap-2">
-          <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-white/10"><NodeIcon type={type} className="w-4.5 h-4.5 text-[var(--foreground)]" /></span>
+          <span className={`flex items-center justify-center w-8 h-8 rounded-lg ${nodeColor.bg} ring-1 ${nodeColor.ring}`}><NodeIcon type={type} className={`w-4.5 h-4.5 ${nodeColor.icon}`} /></span>
           <div className="flex-1 min-w-0">
             <h3 className="text-sm font-semibold text-[var(--foreground)] truncate">{label}</h3>
             <p className="text-[10px] text-[var(--muted-foreground)] truncate">

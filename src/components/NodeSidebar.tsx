@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { Search, ChevronDown, ChevronRight, GripVertical } from 'lucide-react';
 import { NODE_CATEGORIES, type NodeType } from '@/lib/types';
-import { NodeIcon, CategoryIcon } from '@/lib/node-icons';
+import { NodeIcon, CategoryIcon, getNodeColor } from '@/lib/node-icons';
 
 interface NodeSidebarProps {
   onDragStart: (type: NodeType) => void;
@@ -89,7 +89,7 @@ export default function NodeSidebar({ onDragStart }: NodeSidebarProps) {
                     title={nodeType.description}
                   >
                     <GripVertical className="w-3 h-3 text-[var(--muted-foreground)]/30 group-hover:text-[var(--muted-foreground)]/60 flex-shrink-0" />
-                    <span className="flex items-center justify-center w-7 h-7 rounded-md bg-[var(--secondary)]"><NodeIcon type={nodeType.type} className="w-3.5 h-3.5 text-[var(--foreground)]" /></span>
+                    <span className={`flex items-center justify-center w-7 h-7 rounded-md ${getNodeColor(nodeType.type).bg} ring-1 ${getNodeColor(nodeType.type).ring}`}><NodeIcon type={nodeType.type} className={`w-3.5 h-3.5 ${getNodeColor(nodeType.type).icon}`} /></span>
                     <div className="min-w-0">
                       <p className="text-xs font-medium text-[var(--foreground)] truncate">
                         {nodeType.label}

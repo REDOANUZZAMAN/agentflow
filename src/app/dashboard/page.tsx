@@ -10,7 +10,7 @@ import {
   BarChart3, Laugh, Newspaper, AtSign, Search, Clapperboard, Camera,
   Bot, Package, ChevronRight, Clock, Workflow
 } from 'lucide-react';
-import { WorkflowIcon as WorkflowIconComponent, NodeIcon } from '@/lib/node-icons';
+import { WorkflowIcon as WorkflowIconComponent, NodeIcon, getNodeColor } from '@/lib/node-icons';
 
 const supabase = createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 
@@ -300,8 +300,8 @@ export default function DashboardPage() {
                       {wf.nodes.length > 0 ? (
                         <div className="flex gap-1.5 items-center">
                           {wf.nodes.slice(0, 5).map((n: any, i: number) => (
-                            <div key={i} className="w-8 h-8 rounded bg-[var(--bg-elevated)] border border-[var(--border-subtle)] flex items-center justify-center" title={n.data?.label}>
-                              <NodeIcon type={n.data?.type} className="w-3 h-3 text-[var(--text-muted)]" />
+                            <div key={i} className={`w-8 h-8 rounded ${getNodeColor(n.data?.type || '').bg} ring-1 ${getNodeColor(n.data?.type || '').ring} flex items-center justify-center`} title={n.data?.label}>
+                              <NodeIcon type={n.data?.type} className={`w-3.5 h-3.5 ${getNodeColor(n.data?.type || '').icon}`} />
                             </div>
                           ))}
                           {wf.nodes.length > 5 && <span className="text-tiny text-[var(--text-muted)]">+{wf.nodes.length - 5}</span>}

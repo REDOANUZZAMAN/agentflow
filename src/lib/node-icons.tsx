@@ -10,6 +10,70 @@ import {
   Share2, Hash, Laugh, Newspaper, Sparkles, Eye, Workflow,
 } from 'lucide-react';
 
+// ─── Node Color Map ──────────────────────────────────────────
+// Each node type gets a unique color: { icon: tailwind text color, bg: tailwind bg color, ring: ring color }
+export interface NodeColor {
+  icon: string;   // e.g. 'text-amber-400'
+  bg: string;     // e.g. 'bg-amber-500/15'
+  ring: string;   // e.g. 'ring-amber-500/30'
+  gradient: string; // gradient for canvas node header
+}
+
+const NODE_COLOR_MAP: Record<string, NodeColor> = {
+  // Triggers — warm amber/orange
+  manual_trigger:    { icon: 'text-amber-400',   bg: 'bg-amber-500/15',   ring: 'ring-amber-500/30',   gradient: 'from-amber-500/20 to-orange-500/20' },
+  schedule_trigger:  { icon: 'text-orange-400',  bg: 'bg-orange-500/15',  ring: 'ring-orange-500/30',  gradient: 'from-orange-500/20 to-yellow-500/20' },
+  webhook_trigger:   { icon: 'text-yellow-400',  bg: 'bg-yellow-500/15',  ring: 'ring-yellow-500/30',  gradient: 'from-yellow-500/20 to-amber-500/20' },
+  // AI — purple/indigo
+  claude_chat:       { icon: 'text-purple-400',  bg: 'bg-purple-500/15',  ring: 'ring-purple-500/30',  gradient: 'from-purple-500/20 to-indigo-500/20' },
+  image_gen:         { icon: 'text-fuchsia-400', bg: 'bg-fuchsia-500/15', ring: 'ring-fuchsia-500/30', gradient: 'from-fuchsia-500/20 to-pink-500/20' },
+  video_gen:         { icon: 'text-pink-400',    bg: 'bg-pink-500/15',    ring: 'ring-pink-500/30',    gradient: 'from-pink-500/20 to-rose-500/20' },
+  voice_gen:         { icon: 'text-violet-400',  bg: 'bg-violet-500/15',  ring: 'ring-violet-500/30',  gradient: 'from-violet-500/20 to-purple-500/20' },
+  // Social — blues/cyans
+  post_x:            { icon: 'text-sky-400',     bg: 'bg-sky-500/15',     ring: 'ring-sky-500/30',     gradient: 'from-sky-500/20 to-blue-500/20' },
+  post_instagram:    { icon: 'text-pink-400',    bg: 'bg-pink-500/15',    ring: 'ring-pink-500/30',    gradient: 'from-pink-500/20 to-rose-500/20' },
+  post_linkedin:     { icon: 'text-blue-400',    bg: 'bg-blue-500/15',    ring: 'ring-blue-500/30',    gradient: 'from-blue-500/20 to-indigo-500/20' },
+  post_tiktok:       { icon: 'text-rose-400',    bg: 'bg-rose-500/15',    ring: 'ring-rose-500/30',    gradient: 'from-rose-500/20 to-red-500/20' },
+  // Communications — green/emerald
+  send_email:        { icon: 'text-emerald-400', bg: 'bg-emerald-500/15', ring: 'ring-emerald-500/30', gradient: 'from-emerald-500/20 to-green-500/20' },
+  send_telegram:     { icon: 'text-cyan-400',    bg: 'bg-cyan-500/15',    ring: 'ring-cyan-500/30',    gradient: 'from-cyan-500/20 to-sky-500/20' },
+  // Web — teal/orange
+  http_request:      { icon: 'text-orange-400',  bg: 'bg-orange-500/15',  ring: 'ring-orange-500/30',  gradient: 'from-orange-500/20 to-amber-500/20' },
+  web_search:        { icon: 'text-teal-400',    bg: 'bg-teal-500/15',    ring: 'ring-teal-500/30',    gradient: 'from-teal-500/20 to-cyan-500/20' },
+  web_scraper:       { icon: 'text-slate-400',   bg: 'bg-slate-500/15',   ring: 'ring-slate-500/30',   gradient: 'from-slate-500/20 to-gray-500/20' },
+  // Files — warm yellows
+  file_read:         { icon: 'text-yellow-400',  bg: 'bg-yellow-500/15',  ring: 'ring-yellow-500/30',  gradient: 'from-yellow-500/20 to-amber-500/20' },
+  file_write:        { icon: 'text-lime-400',    bg: 'bg-lime-500/15',    ring: 'ring-lime-500/30',    gradient: 'from-lime-500/20 to-green-500/20' },
+  file_generate:     { icon: 'text-amber-400',   bg: 'bg-amber-500/15',   ring: 'ring-amber-500/30',   gradient: 'from-amber-500/20 to-yellow-500/20' },
+  // Video Pipeline — vivid rainbow
+  script_parser:     { icon: 'text-cyan-400',    bg: 'bg-cyan-500/15',    ring: 'ring-cyan-500/30',    gradient: 'from-cyan-500/20 to-teal-500/20' },
+  element_reference: { icon: 'text-fuchsia-400', bg: 'bg-fuchsia-500/15', ring: 'ring-fuchsia-500/30', gradient: 'from-fuchsia-500/20 to-pink-500/20' },
+  photo_generator:   { icon: 'text-rose-400',    bg: 'bg-rose-500/15',    ring: 'ring-rose-500/30',    gradient: 'from-rose-500/20 to-orange-500/20' },
+  video_generator:   { icon: 'text-red-400',     bg: 'bg-red-500/15',     ring: 'ring-red-500/30',     gradient: 'from-red-500/20 to-amber-500/20' },
+  voiceover_generator: { icon: 'text-sky-400',   bg: 'bg-sky-500/15',     ring: 'ring-sky-500/30',     gradient: 'from-sky-500/20 to-blue-500/20' },
+  music_generator:   { icon: 'text-indigo-400',  bg: 'bg-indigo-500/15',  ring: 'ring-indigo-500/30',  gradient: 'from-indigo-500/20 to-violet-500/20' },
+  project_orchestrator: { icon: 'text-emerald-400', bg: 'bg-emerald-500/15', ring: 'ring-emerald-500/30', gradient: 'from-emerald-500/20 to-cyan-500/20' },
+  final_video_compiler: { icon: 'text-red-400',  bg: 'bg-red-500/15',     ring: 'ring-red-500/30',     gradient: 'from-rose-500/20 to-red-500/20' },
+  // Logic — violet
+  if_else:           { icon: 'text-violet-400',  bg: 'bg-violet-500/15',  ring: 'ring-violet-500/30',  gradient: 'from-violet-500/20 to-purple-500/20' },
+  loop:              { icon: 'text-indigo-400',  bg: 'bg-indigo-500/15',  ring: 'ring-indigo-500/30',  gradient: 'from-indigo-500/20 to-violet-500/20' },
+  wait:              { icon: 'text-gray-400',    bg: 'bg-gray-500/15',    ring: 'ring-gray-500/30',    gradient: 'from-gray-500/20 to-slate-500/20' },
+};
+
+const DEFAULT_NODE_COLOR: NodeColor = {
+  icon: 'text-gray-400',
+  bg: 'bg-gray-500/15',
+  ring: 'ring-gray-500/30',
+  gradient: 'from-gray-500/20 to-zinc-500/20',
+};
+
+/**
+ * Get the color scheme for a node type.
+ */
+export function getNodeColor(nodeType: string): NodeColor {
+  return NODE_COLOR_MAP[nodeType] || DEFAULT_NODE_COLOR;
+}
+
 // Map node types to Lucide icons (replaces emoji strings)
 const NODE_ICON_MAP: Record<string, React.ComponentType<{ className?: string; strokeWidth?: number }>> = {
   // Triggers

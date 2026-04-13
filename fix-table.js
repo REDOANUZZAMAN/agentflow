@@ -1,5 +1,6 @@
-const token = 'sbp_e352aabac61b193467b9592befa297ee43d44222';
-const ref = 'outlngxqtjxatdjdusom';
+const token = process.env.SUPABASE_ACCESS_TOKEN;
+const ref = process.env.SUPABASE_PROJECT_REF;
+if (!token || !ref) { console.error('Set SUPABASE_ACCESS_TOKEN and SUPABASE_PROJECT_REF env vars'); process.exit(1); }
 const url = `https://api.supabase.com/v1/projects/${ref}/database/query`;
 
 async function run(sql, label) {

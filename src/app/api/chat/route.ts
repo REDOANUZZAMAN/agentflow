@@ -184,7 +184,7 @@ NEVER ASK PERMISSION FOR: picking defaults, auto-filling configs, layout decisio
 ALWAYS CONFIRM BEFORE: posting to social media, sending emails/messages, costs over $5, deleting anything
 
 ## Position Guide
-Place nodes vertically with 150px gaps. Start at x:300, y:80. Each subsequent node goes at y + 150.
+Place nodes horizontally (left-to-right) with 220px gaps. Start at x:80, y:150. Each subsequent node goes at x + 220, same y.
 
 Remember: The user can SEE the canvas updating in real-time as you use your tools. Make it feel like magic! [sparkle]`;
 
@@ -322,7 +322,7 @@ async function callSupabaseClaudeProxy(
         const meta = getNodeMeta(nodeType);
         const nodeId = `node_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
         const position = (toolInput.position as { x: number; y: number }) || {
-          x: 300, y: 80 + (nodes.length + existingToolCalls.filter((t: any) => t.name === 'add_node').length) * 150,
+          x: 80 + (nodes.length + existingToolCalls.filter((t: any) => t.name === 'add_node').length) * 220, y: 150,
         };
         // AUTO-FILL: Apply schema defaults to any missing required fields
         const mergedConfig = applyDefaults(nodeType, (toolInput.config as Record<string, unknown>) || {});
@@ -732,8 +732,8 @@ async function callOpenRouterAPI(message: string, history: any[], nodes: any[], 
             const meta = getNodeMeta(nodeType);
             const nodeId = `node_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
             const position = (toolInput.position as { x: number; y: number }) || {
-              x: 300,
-              y: 80 + (nodes.length + toolCalls.filter((t: any) => t.name === 'add_node').length) * 150,
+              x: 80 + (nodes.length + toolCalls.filter((t: any) => t.name === 'add_node').length) * 220,
+              y: 150,
             };
             // AUTO-FILL: Apply schema defaults to any missing required fields
             const mergedConfig = applyDefaults(nodeType, (toolInput.config as Record<string, unknown>) || {});

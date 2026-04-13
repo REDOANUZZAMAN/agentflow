@@ -16,137 +16,128 @@ type WorkflowNodeData = Node<{
   output?: unknown;
 }>;
 
-// Use a plain function (no memo) to ensure it renders
+// Compact n8n-style node with horizontal (left→right) connections
 export default function WorkflowNodeComponent(props: NodeProps) {
-  // Access data from props - React Flow v12 passes data as Record<string, unknown>
   const data = props.data || {};
   const status = (data.status as string) || 'idle';
-  const emoji = (data.emoji as string) || '?';
   const label = (data.label as string) || 'Node';
   const type = (data.type as string) || 'unknown';
   const error = data.error as string | undefined;
   const config = (data.config as Record<string, unknown>) || {};
   const selected = props.selected;
 
-  const statusColors: Record<string, string> = {
+  const nodeColor = getNodeColor(type);
+  const isTrigger = type.includes('trigger');
+
+  // Status-specific border
+  const statusBorder: Record<string, string> = {
     idle: 'border-[var(--border)]',
-    running: 'border-[var(--primary)] node-running',
-    success: 'border-[var(--success)]',
-    error: 'border-[var(--destructive)]',
+    running: 'border-[var(--primary)] shadow-[0_0_12px_rgba(99,102,241,0.4)]',
+    success: 'border-emerald-500/60',
+    error: 'border-red-500/60',
   };
 
-  const nodeColor = getNodeColor(type);
-  const bgGradient = nodeColor.gradient;
-  const isTrigger = type.includes('trigger');
+  // Status badge
+  const statusBadge = () => {
+    if (status === 'running') return <Loader2 className="w-3 h-3 text-[var(--primary)] animate-spin" />;
+    if (status === 'success') return <CheckCircle2 className="w-3 h-3 text-emerald-400" />;
+    if (status === 'error') return <XCircle className="w-3 h-3 text-red-400" />;
+    return null;
+  };
+
+  const subtitle = getNodeSubtitle(type, config);
 
   return (
     <div
       className={`
-        node-appear relative bg-[var(--card)] rounded-xl border-2 ${statusColors[status] || statusColors.idle}
-        ${selected ? '!border-[var(--primary)] ring-2 ring-[var(--primary)]/30' : ''}
-        shadow-lg hover:shadow-xl transition-all duration-200
-        min-w-[180px] max-w-[240px]
+        node-appear relative flex items-center gap-2.5
+        bg-[var(--card)] rounded-xl border ${statusBorder[status] || statusBorder.idle}
+        ${selected ? '!border-[var(--primary)] ring-2 ring-[var(--primary)]/20' : ''}
+        shadow-md hover:shadow-lg transition-all duration-150
+        px-3 py-2.5 min-w-[140px] max-w-[200px]
       `}
     >
-      {/* Top handle (input) - not for triggers */}
+      {/* Left handle (input) — not for triggers */}
       {!isTrigger && (
         <Handle
           type="target"
-          position={Position.Top}
-          className="!w-3 !h-3 !bg-[var(--primary)] !border-2 !border-[var(--card)] !-top-1.5"
+          position={Position.Left}
+          className="!w-2.5 !h-2.5 !bg-[var(--muted-foreground)] !border-2 !border-[var(--card)] !-left-[6px]"
         />
       )}
 
-      {/* Node content */}
-      <div className={`bg-gradient-to-br ${bgGradient} rounded-t-[10px] px-4 py-3`}>
-        <div className="flex items-center gap-2">
-          <span className={`flex items-center justify-center w-8 h-8 rounded-lg ${nodeColor.bg} ring-1 ${nodeColor.ring}`}><NodeIcon type={type} className={`w-4.5 h-4.5 ${nodeColor.icon}`} /></span>
-          <div className="flex-1 min-w-0">
-            <h3 className="text-sm font-semibold text-[var(--foreground)] truncate">{label}</h3>
-            <p className="text-[10px] text-[var(--muted-foreground)] truncate">
-              {getNodeDescription(type, config)}
-            </p>
-          </div>
-          {/* Status icon */}
-          <div className="flex-shrink-0">
-            {status === 'running' && <Loader2 className="w-4 h-4 text-[var(--primary)] animate-spin" />}
-            {status === 'success' && <CheckCircle2 className="w-4 h-4 text-[var(--success)]" />}
-            {status === 'error' && <XCircle className="w-4 h-4 text-[var(--destructive)]" />}
-          </div>
-        </div>
+      {/* Colored icon */}
+      <div className={`flex-shrink-0 w-9 h-9 rounded-lg ${nodeColor.bg} ring-1 ${nodeColor.ring} flex items-center justify-center`}>
+        <NodeIcon type={type} className={`w-4.5 h-4.5 ${nodeColor.icon}`} />
       </div>
 
-      {/* Config summary */}
-      <div className="px-4 py-2 text-[11px] text-[var(--muted-foreground)] overflow-hidden break-words line-clamp-2 max-h-[3.5em]">
-        {getConfigSummary(type, config)}
+      {/* Label + subtitle */}
+      <div className="flex-1 min-w-0">
+        <h3 className="text-[12px] font-semibold text-[var(--foreground)] truncate leading-tight">{label}</h3>
+        {subtitle && (
+          <p className="text-[10px] text-[var(--muted-foreground)] truncate leading-tight mt-0.5">{subtitle}</p>
+        )}
       </div>
 
-      {/* Error message */}
-      {error && (
-        <div className="px-3 py-1.5 bg-[var(--destructive)]/10 border-t border-[var(--destructive)]/20 text-[10px] text-[var(--destructive)] rounded-b-[10px]">
-          {error}
-        </div>
+      {/* Status badge */}
+      {statusBadge() && (
+        <div className="flex-shrink-0">{statusBadge()}</div>
       )}
 
-      {/* Bottom handle (output) */}
+      {/* Right handle (output) */}
       <Handle
         type="source"
-        position={Position.Bottom}
-        className="!w-3 !h-3 !bg-[var(--primary)] !border-2 !border-[var(--card)] !-bottom-1.5"
+        position={Position.Right}
+        className="!w-2.5 !h-2.5 !bg-[var(--primary)] !border-2 !border-[var(--card)] !-right-[6px]"
       />
 
-      {/* Show how it works button */}
-      <button
-        className="absolute -right-1 -top-1 w-5 h-5 rounded-full bg-[var(--secondary)] border border-[var(--border)] flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity"
-        title="Show me how it works"
-      >
-        <HelpCircle className="w-3 h-3 text-[var(--muted-foreground)]" />
-      </button>
+      {/* Error tooltip */}
+      {error && (
+        <div className="absolute left-0 -bottom-6 right-0 text-center">
+          <span className="inline-block px-2 py-0.5 bg-red-500/90 text-white text-[9px] rounded-md truncate max-w-[180px]">
+            {error}
+          </span>
+        </div>
+      )}
     </div>
   );
 }
 
-function getNodeDescription(type: string, config: Record<string, unknown>): string {
+function getNodeSubtitle(type: string, config: Record<string, unknown>): string {
   switch (type) {
     case 'schedule_trigger':
-      return config.schedule ? `Runs ${config.schedule}` : 'Set a schedule';
+      return config.schedule ? `${config.schedule}` : '';
     case 'manual_trigger':
       return 'Click to run';
     case 'webhook_trigger':
-      return config.url ? `${config.url}` : 'Webhook URL';
+      return config.url ? `${config.url}` : '';
     case 'claude_chat':
-      return config.prompt ? `"${(config.prompt as string).slice(0, 30)}..."` : 'AI text generation';
+      return config.prompt ? `${(config.prompt as string).slice(0, 25)}...` : '';
     case 'send_email':
-      return config.to ? `To: ${config.to}` : 'Configure email';
+      return config.to ? `To: ${config.to}` : '';
     case 'post_x':
-      return 'Post to X (Twitter)';
+      return 'Twitter/X';
+    case 'post_instagram':
+      return 'Instagram';
+    case 'post_linkedin':
+      return 'LinkedIn';
+    case 'post_tiktok':
+      return 'TikTok';
     case 'http_request':
-      return config.url ? `${config.method || 'GET'} ${config.url}` : 'API call';
+      return config.url ? `${config.method || 'GET'} ...` : '';
     case 'web_search':
-      return config.query ? `"${config.query}"` : 'Web search';
+      return config.query ? `"${(config.query as string).slice(0, 20)}"` : '';
     case 'final_video_compiler':
-      return config.transition ? `${config.transition} • ${config.outputResolution || '1080p'}` : 'Merge all shots into one video';
+      return config.transition ? `${config.transition}` : '';
     case 'project_orchestrator':
-      return config.projectName ? `${config.projectName}` : 'Full pipeline orchestrator';
+      return config.projectName ? `${(config.projectName as string).slice(0, 20)}` : '';
+    case 'element_reference':
+      return config.elementName ? `${config.elementName}` : '';
+    case 'photo_generator':
+    case 'video_generator':
+    case 'voiceover_generator':
+      return config.prompt ? `${(config.prompt as string).slice(0, 22)}...` : '';
     default:
-      return type.replace(/_/g, ' ');
+      return '';
   }
-}
-
-function getConfigSummary(type: string, config: Record<string, unknown>): string {
-  const entries = Object.entries(config).filter(([, v]) => v !== undefined && v !== null && v !== '');
-  if (entries.length === 0) return 'Click to configure';
-  
-  // Show at most 2 fields, each truncated to 30 chars max
-  const truncate = (s: string, max: number) => s.length > max ? s.slice(0, max) + '…' : s;
-  
-  return entries
-    .slice(0, 2)
-    .map(([key, val]) => {
-      const display = typeof val === 'string' 
-        ? truncate(val, 30) 
-        : truncate(JSON.stringify(val), 30);
-      return `${key}: ${display}`;
-    })
-    .join(' • ');
 }

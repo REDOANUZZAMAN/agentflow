@@ -335,7 +335,8 @@ function WorkflowCanvasInner() {
         className="bg-[var(--background)]"
         proOptions={{ hideAttribution: true }}
         connectionLineStyle={{ stroke: '#6366f1', strokeWidth: 2 }}
-        defaultEdgeOptions={{ style: { stroke: '#6366f1', strokeWidth: 2 } }}
+        defaultEdgeOptions={{ type: 'smoothstep', style: { stroke: '#6366f1', strokeWidth: 2 }, animated: false }}
+        connectionLineType={'smoothstep' as any}
         deleteKeyCode={null}
         panOnDrag
         selectionKeyCode="Shift"

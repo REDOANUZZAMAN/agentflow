@@ -426,7 +426,7 @@ export function createNode(type: NodeType, config: Record<string, unknown> = {},
   return {
     id,
     type: 'workflowNode',
-    position: position || { x: 250, y: 100 + (nodeCounter - 1) * 150 },
+    position: position || { x: 80 + (nodeCounter - 1) * 220, y: 150 },
     data: {
       type,
       label: meta.label,
@@ -478,7 +478,8 @@ export function autoLayout(nodes: WorkflowNode[], edges: WorkflowEdge[]): Workfl
   const isVideoPipeline = photos.length > 0 || videos.length > 0;
 
   if (!isVideoPipeline) {
-    // Simple vertical layout for non-pipeline workflows
+    // Horizontal layout (left-to-right) for non-pipeline workflows
+    const NODE_GAP_X = 220; // horizontal gap between nodes
     const hasIncoming = new Set(edges.map(e => e.target));
     const roots = nodes.filter(n => !hasIncoming.has(n.id));
     const visited = new Set<string>();
@@ -493,7 +494,7 @@ export function autoLayout(nodes: WorkflowNode[], edges: WorkflowEdge[]): Workfl
       queue.push(...children);
     }
     for (const n of nodes) { if (!visited.has(n.id)) ordered.push(n); }
-    return ordered.map((node, i) => ({ ...node, position: { x: 300, y: 80 + i * 150 } }));
+    return ordered.map((node, i) => ({ ...node, position: { x: 80 + i * NODE_GAP_X, y: 150 } }));
   }
 
   // Video pipeline grid layout

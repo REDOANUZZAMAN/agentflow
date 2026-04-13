@@ -10,6 +10,7 @@ import {
   DollarSign, FileText, Check, AlertTriangle
 } from 'lucide-react';
 import { type Asset, type AssetType, formatFileSize, formatCost, formatDate, getAssetIcon } from '@/lib/library-types';
+import { WorkflowIcon } from '@/lib/node-icons';
 
 // Generate a thumbnail URL for Cloudinary videos
 function getVideoThumbnail(url: string): string {
@@ -328,7 +329,7 @@ export default function LibraryPage() {
                       className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs transition-colors ${selectedWorkflow === wf.id ? 'bg-[var(--secondary)] text-[var(--foreground)]' : 'text-[var(--muted-foreground)] hover:bg-[var(--secondary)] hover:text-[var(--foreground)]'}`}
                     >
                       {selectedWorkflow === wf.id ? <ChevronDown className="w-3 h-3 flex-shrink-0" /> : <ChevronRight className="w-3 h-3 flex-shrink-0" />}
-                      <span>{wf.emoji}</span>
+                      <WorkflowIcon emoji={wf.emoji} className="w-3.5 h-3.5 text-[var(--primary)]" />
                       {renamingId === wf.id ? (
                         <input
                           autoFocus
@@ -397,7 +398,7 @@ export default function LibraryPage() {
             {currentWorkflow && (
               <>
                 <ChevronRight className="w-3 h-3" />
-                <button onClick={() => setSelectedRun(null)} className="hover:text-[var(--foreground)]">{currentWorkflow.emoji} {currentWorkflow.name}</button>
+                <button onClick={() => setSelectedRun(null)} className="hover:text-[var(--foreground)] flex items-center gap-1"><WorkflowIcon emoji={currentWorkflow.emoji} className="w-3 h-3" /> {currentWorkflow.name}</button>
               </>
             )}
             {selectedRun && currentWorkflow && (

@@ -230,7 +230,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 3. Fall back to demo mode
-    console.log('📎 Using demo mode (no working API key)');
+    console.log('[demo] Using demo mode (no working API key)');
     return NextResponse.json(simulateResponse(message, nodes, edges));
   } catch (error: any) {
     console.error('Chat API error:', error);
@@ -428,7 +428,7 @@ async function callSupabaseClaudeProxy(
       if (processed.name === 'create_task_list' && processed.input?.tasks) {
         taskListCreated = true;
         plannedTaskCount = (processed.input.tasks as any[]).length;
-        console.log(`📋 Task list created with ${plannedTaskCount} tasks`);
+        console.log(`[tasks] Task list created with ${plannedTaskCount} tasks`);
       }
       toolResults.push({
         type: 'tool_result',
@@ -1278,7 +1278,7 @@ function buildScriptToVideoWorkflow(existingNodes: any[]) {
     workflowName: '[video] Script to Video Pipeline',
     workflowEmoji: '[video]',
     buttons: [
-      { label: '📋 Paste Script', action: 'I want to paste my script now' },
+      { label: 'Paste Script', action: 'I want to paste my script now' },
       { label: '[key] Add Credentials', action: 'How do I add my fal.ai and Cloudinary API keys?' },
       { label: '[gear] Change Models', action: 'What other models can I use for photo/video/voice generation?' },
     ],

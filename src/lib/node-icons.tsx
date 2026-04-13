@@ -7,7 +7,7 @@ import {
   Globe, Search, Bug, FolderOpen, FileText, Pencil, FileOutput,
   ScrollText, Drama, Camera, Film, AudioLines, Target, Clapperboard,
   GitBranch, Repeat, Timer, Zap, Bot, Package, Settings, HelpCircle,
-  Share2, Hash,
+  Share2, Hash, Laugh, Newspaper, Sparkles, Eye, Workflow,
 } from 'lucide-react';
 
 // Map node types to Lucide icons (replaces emoji strings)
@@ -93,4 +93,71 @@ export function NodeIcon({ type, className = 'w-4 h-4', strokeWidth = 1.5 }: { t
 export function CategoryIcon({ name, className = 'w-4 h-4', strokeWidth = 1.5 }: { name: string; className?: string; strokeWidth?: number }) {
   const Icon = getCategoryIcon(name);
   return <Icon className={className} strokeWidth={strokeWidth} />;
+}
+
+// ─── Workflow Icon (maps emoji strings to Lucide icons) ─────
+
+// Maps old emoji characters AND new [text] markers to Lucide icons
+const WORKFLOW_EMOJI_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
+  // Old emoji characters (from Supabase stored data)
+  '🤖': Bot,
+  '😂': Laugh,
+  '📰': Newspaper,
+  '✨': Sparkles,
+  '🔍': Search,
+  '🎬': Film,
+  '⚡': Zap,
+  '🧠': Brain,
+  '📧': Mail,
+  '🐦': Hash,
+  '🔗': Link2,
+  '⏰': Clock,
+  '🎯': Target,
+  '📸': Camera,
+  '🎵': Music,
+  '💼': Briefcase,
+  '🌐': Globe,
+  '📁': FolderOpen,
+  '🎥': Film,
+  '⚙️': Settings,
+  // New [text] markers
+  '[bot]': Bot,
+  '[joke]': Laugh,
+  '[news]': Newspaper,
+  '[sparkle]': Sparkles,
+  '[search]': Search,
+  '[video]': Film,
+  '[zap]': Zap,
+  '[brain]': Brain,
+  '[email]': Mail,
+  '[bird]': Hash,
+  '[link]': Link2,
+  '[clock]': Clock,
+  '[target]': Target,
+  '[photo]': Camera,
+  '[music]': Music,
+  '[briefcase]': Briefcase,
+  '[globe]': Globe,
+  '[folder]': FolderOpen,
+  '[camera]': Film,
+  '[gear]': Settings,
+  '[eye]': Eye,
+};
+
+/**
+ * Get Lucide icon for a workflow emoji string (handles old emojis + new text markers).
+ * Falls back to Bot icon.
+ */
+export function getWorkflowIcon(emoji: string): React.ComponentType<{ className?: string }> {
+  if (!emoji) return Bot;
+  const trimmed = emoji.trim();
+  return WORKFLOW_EMOJI_MAP[trimmed] || Bot;
+}
+
+/**
+ * Render a workflow icon as JSX. Maps any emoji string to a Lucide icon.
+ */
+export function WorkflowIcon({ emoji, className = 'w-4 h-4' }: { emoji?: string; className?: string }) {
+  const Icon = getWorkflowIcon(emoji || '');
+  return <Icon className={className} />;
 }

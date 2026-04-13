@@ -216,7 +216,7 @@ async function executePhotoGenerator(node: WorkflowNode, ctx: ExecutionContext) 
     if (elementsNotInPrompt.length > 0) {
       finalPrompt = `${finalPrompt}. Featuring: ${elementsNotInPrompt.join(', ')}`;
       ctx.emit({ type: 'log', nodeId: node.id, data: { 
-        message: `📝 Enriched prompt with element names: ${elementsNotInPrompt.join(', ')}` 
+        message: `[note] Enriched prompt with element names: ${elementsNotInPrompt.join(', ')}` 
       }});
     }
   }
@@ -428,7 +428,7 @@ async function executeVoiceoverGenerator(node: WorkflowNode, ctx: ExecutionConte
     input = {
       script: [{ voice: voice || 'alloy', text: voiceText }],
     };
-    ctx.emit({ type: 'log', nodeId: node.id, data: { message: `📝 Using dialogue format: script array with voice "${voice || 'alloy'}"` } });
+    ctx.emit({ type: 'log', nodeId: node.id, data: { message: `[note] Using dialogue format: script array with voice "${voice || 'alloy'}"` } });
   } else {
     // Standard TTS: text + voice + speed
     input = {
@@ -436,7 +436,7 @@ async function executeVoiceoverGenerator(node: WorkflowNode, ctx: ExecutionConte
       ...(voice ? { voice: voice } : {}),
       ...(finalSpeed ? { speed: Math.round(finalSpeed * 100) / 100 } : {}),
     };
-    ctx.emit({ type: 'log', nodeId: node.id, data: { message: `📝 Using TTS format: text + voice "${voice || 'default'}"${finalSpeed ? ` + speed ${finalSpeed.toFixed(2)}x` : ''}` } });
+    ctx.emit({ type: 'log', nodeId: node.id, data: { message: `[note] Using TTS format: text + voice "${voice || 'default'}"${finalSpeed ? ` + speed ${finalSpeed.toFixed(2)}x` : ''}` } });
   }
 
   ctx.emit({ type: 'api_call', nodeId: node.id, data: { service: 'fal.ai', model: falModel, input } });
@@ -597,7 +597,7 @@ async function executeFinalVideoCompiler(node: WorkflowNode, ctx: ExecutionConte
   }
 
   ctx.emit({ type: 'log', nodeId: node.id, data: { 
-    message: `📹 Found ${videos.length} video clips + ${voiceovers.length} voiceover tracks` 
+    message: `[video] Found ${videos.length} video clips + ${voiceovers.length} voiceover tracks` 
   }});
 
   const cld = initCloudinary();
@@ -682,7 +682,7 @@ async function executeFinalVideoCompiler(node: WorkflowNode, ctx: ExecutionConte
       // Method 1: Two-step transformation (layer + apply as separate steps)
       const videoWithAudioUrl = `https://res.cloudinary.com/${cloudName}/video/upload/l_video:${audioOverlayId}/fl_layer_apply/${splicedVideoId}.mp4`;
       
-      ctx.emit({ type: 'log', nodeId: node.id, data: { message: `📎 Audio overlay URL: ${videoWithAudioUrl.substring(0, 150)}...` } });
+      ctx.emit({ type: 'log', nodeId: node.id, data: { message: `[link] Audio overlay URL: ${videoWithAudioUrl.substring(0, 150)}...` } });
       
       let finalResult: any;
       try {
@@ -915,7 +915,7 @@ export async function executeWorkflow(
     for (let attempt = 0; attempt <= RECOVERY_LIMITS.MAX_ATTEMPTS_PER_NODE; attempt++) {
       // Check execution-wide recovery limit
       if (executionRecoveryCount >= RECOVERY_LIMITS.MAX_ATTEMPTS_PER_EXECUTION) {
-        emit({ type: 'log', nodeId: node.id, data: { message: `🛑 Execution recovery budget exhausted (${executionRecoveryCount} total retries)` } });
+        emit({ type: 'log', nodeId: node.id, data: { message: `[stop] Execution recovery budget exhausted (${executionRecoveryCount} total retries)` } });
         break;
       }
 
@@ -981,7 +981,7 @@ export async function executeWorkflow(
           };
 
           emit({ type: 'log', nodeId: node.id, data: { 
-            message: `🔧 Recovery Agent activated (attempt ${attempt + 1}/${RECOVERY_LIMITS.MAX_ATTEMPTS_PER_NODE}): "${errMsg.substring(0, 100)}"`,
+            message: `[wrench] Recovery Agent activated (attempt ${attempt + 1}/${RECOVERY_LIMITS.MAX_ATTEMPTS_PER_NODE}): "${errMsg.substring(0, 100)}"`,
             recovery: true,
           }});
 
@@ -989,7 +989,7 @@ export async function executeWorkflow(
           const decision = await diagnose(recoveryCtx);
 
           emit({ type: 'log', nodeId: node.id, data: { 
-            message: `🔧 Recovery: ${decision.action} — ${decision.reasoning}`,
+            message: `[wrench] Recovery: ${decision.action} — ${decision.reasoning}`,
             recovery: true,
           }});
 
@@ -1030,7 +1030,7 @@ export async function executeWorkflow(
                   },
                 };
                 emit({ type: 'log', nodeId: node.id, data: { 
-                  message: `📝 Config changed: ${JSON.stringify(decision.configChanges)}`,
+                  message: `[note] Config changed: ${JSON.stringify(decision.configChanges)}`,
                   recovery: true,
                 }});
               }
@@ -1064,7 +1064,7 @@ export async function executeWorkflow(
                   data: { ...currentNode.data, config: fixedConfig },
                 };
                 emit({ type: 'log', nodeId: node.id, data: { 
-                  message: `🔧 Applied transformation: ${decision.transformation}`,
+                  message: `[wrench] Applied transformation: ${decision.transformation}`,
                   recovery: true,
                 }});
               }

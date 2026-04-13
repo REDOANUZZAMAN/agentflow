@@ -60,7 +60,7 @@ export const initialState: AppState = {
     {
       id: 'welcome',
       role: 'assistant',
-      content: `👋 **Hi! I'm your AI Agent Builder.**\n\nTell me what you want your agent to do, and I'll build it right here on the canvas. You'll see every step as I create it!\n\nHere are some ideas to get started:`,
+      content: `**Hi! I'm your AI Agent Builder.**\n\nTell me what you want your agent to do, and I'll build it right here on the canvas. You'll see every step as I create it!\n\nHere are some ideas to get started:`,
       timestamp: new Date(),
       buttons: [
         { label: '[email] Daily news summary by email', action: 'Make me an agent that writes a daily news summary and emails it to me' },

@@ -10,6 +10,7 @@ import {
   BarChart3, Laugh, Newspaper, AtSign, Search, Clapperboard, Camera,
   Bot, Package, ChevronRight, Clock, Workflow
 } from 'lucide-react';
+import { WorkflowIcon as WorkflowIconComponent } from '@/lib/node-icons';
 
 const supabase = createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 
@@ -150,9 +151,9 @@ export default function DashboardPage() {
   const totalRuns = totalExecutions || workflows.reduce((s, w) => s + (w.run_count || 0), 0);
 
   // Map workflow emoji field to a Lucide icon
-  const getWorkflowIcon = (emoji: string) => {
+  const getWorkflowIconLocal = (emoji: string) => {
     if (TEMPLATE_ICONS[emoji]) return TEMPLATE_ICONS[emoji];
-    return <Bot className="w-4 h-4 text-[var(--primary)]" />;
+    return <WorkflowIconComponent emoji={emoji} className="w-4 h-4 text-[var(--primary)]" />;
   };
 
   const NAV_ITEMS = [
@@ -325,7 +326,7 @@ export default function DashboardPage() {
                           />
                         ) : (
                           <h3 className="text-body font-medium text-[var(--foreground)] truncate flex items-center gap-2">
-                            {getWorkflowIcon(wf.emoji)}
+                            {getWorkflowIconLocal(wf.emoji)}
                             {wf.name}
                           </h3>
                         )}

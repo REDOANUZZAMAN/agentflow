@@ -23,7 +23,7 @@ import { useApp } from '@/lib/context';
 import { createNode, createEdge } from '@/lib/store';
 import { getNodeMeta, type NodeType } from '@/lib/types';
 import WorkflowNodeComponent from './WorkflowNode';
-import { NodeIcon } from '@/lib/node-icons';
+import { NodeIcon, WorkflowIcon } from '@/lib/node-icons';
 import { FloatingTaskWidget } from './TaskListCard';
 import CanvasContextMenu, { getCanvasMenuItems, getNodeMenuItems } from './CanvasContextMenu';
 
@@ -275,7 +275,7 @@ function WorkflowCanvasInner() {
       {/* Header */}
       <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-4 py-2 bg-[var(--background)]/80 backdrop-blur-sm border-b border-[var(--border)]">
         <div className="flex items-center gap-2">
-          <span className="text-lg">{state.workflowEmoji}</span>
+          <WorkflowIcon emoji={state.workflowEmoji} className="w-5 h-5 text-[var(--primary)]" />
           <h2 className="text-sm font-semibold text-[var(--foreground)]">{state.workflowName}</h2>
           <span className="text-xs text-[var(--muted-foreground)]">
             {state.nodes.length} node{state.nodes.length !== 1 ? 's' : ''}

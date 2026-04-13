@@ -6,6 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
 import { MessageSquare, Puzzle, PanelRightClose, PanelRightOpen, Keyboard, FolderOpen, ArrowLeft, Play, Square, AlertTriangle } from 'lucide-react';
 import { AppProvider, useApp } from '@/lib/context';
+import { WorkflowIcon } from '@/lib/node-icons';
 import ChatPanel from '@/components/ChatPanel';
 import WorkflowCanvas from '@/components/WorkflowCanvas';
 import InspectorPanel from '@/components/InspectorPanel';
@@ -349,7 +350,7 @@ function BuilderLayout() {
               className="text-xs text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--secondary)] px-2 py-0.5 rounded transition-colors cursor-text"
               title="Click to rename"
             >
-              {state.workflowEmoji} {state.workflowName}
+              <WorkflowIcon emoji={state.workflowEmoji} className="w-4 h-4 text-[var(--primary)]" /> {state.workflowName}
             </button>
           )}
         </div>

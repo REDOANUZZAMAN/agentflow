@@ -55,7 +55,7 @@ export const IMAGE_MODEL_CATALOG = [
   {
     id: FAL_MODELS.IMAGE_SEEDREAM_EDIT,
     name: 'Seedream 4.5 Edit',
-    label: '🌟 Seedream 4.5 Edit (up to 10 refs)',
+    label: '[star] Seedream 4.5 Edit (up to 10 refs)',
     description: 'Edit images with up to 10 reference images.',
     bestFor: ['complex composites', 'multi-element scenes'],
     cost: '$0.08',
@@ -76,7 +76,7 @@ export const VIDEO_MODEL_CATALOG = [
   {
     id: FAL_MODELS.VIDEO_KLING_O3_T2V,
     name: 'Kling O3 Pro (Text→Video)',
-    label: '📝 Kling O3 Pro Text-to-Video',
+    label: '[note] Kling O3 Pro Text-to-Video',
     description: 'Generate video from text only, no input image needed.',
     cost: '$0.95',
     inputType: 'text',
@@ -84,7 +84,7 @@ export const VIDEO_MODEL_CATALOG = [
   {
     id: FAL_MODELS.VIDEO_KLING_O3_R2V,
     name: 'Kling O3 Pro (Reference→Video)',
-    label: '🧬 Kling O3 Pro Reference-to-Video',
+    label: '[dna] Kling O3 Pro Reference-to-Video',
     description: 'Multi-character consistency with @Element tags.',
     cost: '$1.20',
     inputType: 'reference',

@@ -110,8 +110,8 @@ async function executeScheduleTrigger(node: WorkflowNode, ctx: ExecutionContext)
 
 async function executeElementReference(node: WorkflowNode, ctx: ExecutionContext) {
   initFal();
-  const { element_name, description, model } = node.data.config;
-  const elementName = element_name || 'Element';
+  const { element_name, elementName: camelName, description, model } = node.data.config;
+  const elementName = element_name || camelName || 'Element';
   const prompt = description || `High quality reference image of ${elementName}`;
   const falModel = model || FAL_MODELS.IMAGE_NANO_BANANA;
 

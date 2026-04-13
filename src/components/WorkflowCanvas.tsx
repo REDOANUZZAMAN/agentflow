@@ -110,13 +110,44 @@ function WorkflowCanvasInner() {
     }
   }, [dispatch, setRfEdges, state.isRunning]);
 
+  // Track selected edge for deletion
+  const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
+
   // Node click
   const onNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
     dispatch({ type: 'SET_SELECTED_NODE', payload: node.id });
+    setSelectedEdgeId(null);
   }, [dispatch]);
+
+  // Edge click — select edge (shows delete button)
+  const onEdgeClick = useCallback((_: React.MouseEvent, edge: Edge) => {
+    setSelectedEdgeId(prev => prev === edge.id ? null : edge.id);
+    dispatch({ type: 'SET_SELECTED_NODE', payload: null });
+  }, [dispatch]);
+
+  // Delete selected edge
+  const deleteSelectedEdge = useCallback(() => {
+    if (selectedEdgeId) {
+      dispatch({ type: 'DELETE_EDGE', payload: selectedEdgeId });
+      setSelectedEdgeId(null);
+    }
+  }, [selectedEdgeId, dispatch]);
+
+  // Keyboard handler for edge deletion (Delete or Backspace)
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (selectedEdgeId && (e.key === 'Delete' || e.key === 'Backspace')) {
+        e.preventDefault();
+        deleteSelectedEdge();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [selectedEdgeId, deleteSelectedEdge]);
 
   const onPaneClick = useCallback(() => {
     dispatch({ type: 'SET_SELECTED_NODE', payload: null });
+    setSelectedEdgeId(null);
     setContextMenu(null);
     setShowNodePicker(null);
   }, [dispatch]);
@@ -318,11 +349,19 @@ function WorkflowCanvasInner() {
       {/* Canvas */}
       <ReactFlow
         nodes={rfNodes}
-        edges={rfEdges}
+        edges={rfEdges.map(e => ({
+          ...e,
+          style: e.id === selectedEdgeId
+            ? { stroke: '#ef4444', strokeWidth: 3, cursor: 'pointer' }
+            : { stroke: '#6366f1', strokeWidth: 2 },
+          selected: e.id === selectedEdgeId,
+          interactionWidth: 20,
+        }))}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onNodeClick={onNodeClick}
+        onEdgeClick={onEdgeClick}
         onNodeDragStop={onNodeDragStop}
         onNodeContextMenu={onNodeContextMenu}
         onPaneClick={onPaneClick}
@@ -340,6 +379,7 @@ function WorkflowCanvasInner() {
         deleteKeyCode={null}
         panOnDrag
         selectionKeyCode="Shift"
+        edgesFocusable
       >
         <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#27272a" />
         <Controls className="!bg-[var(--card)] !border-[var(--border)] !rounded-lg !shadow-lg [&>button]:!bg-[var(--card)] [&>button]:!border-[var(--border)] [&>button]:!text-[var(--foreground)] [&>button:hover]:!bg-[var(--secondary)]" />
@@ -348,6 +388,21 @@ function WorkflowCanvasInner() {
 
       {/* Floating task widget */}
       <FloatingTaskWidget />
+
+      {/* Edge selected — delete banner */}
+      {selectedEdgeId && (
+        <div className="absolute top-14 left-1/2 -translate-x-1/2 z-20 flex items-center gap-3 bg-red-500/10 border border-red-500/30 backdrop-blur-sm rounded-lg px-4 py-2 shadow-lg animate-in fade-in slide-in-from-top-2 duration-200">
+          <span className="text-xs text-red-300">Connection selected</span>
+          <button
+            onClick={deleteSelectedEdge}
+            className="flex items-center gap-1.5 px-3 py-1 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+            Delete
+          </button>
+          <span className="text-[10px] text-red-400/60">or press Delete key</span>
+        </div>
+      )}
 
       {/* Context menu */}
       {contextMenu && (

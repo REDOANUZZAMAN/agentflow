@@ -453,8 +453,32 @@ function getConfigFields(type: NodeType | string): FieldDef[] {
     case 'image_gen':
       return [
         { key: 'prompt', label: 'Image Prompt', type: 'textarea', placeholder: 'Describe the image...', required: true },
-        { key: 'size', label: 'Size', type: 'select', options: [
-          { value: '1024x1024', label: '1024×1024' }, { value: '512x512', label: '512×512' },
+        { key: 'model', label: 'Model', type: 'select', options: [
+          { value: 'fal-ai/nano-banana-2', label: 'Nano Banana 2 (default, $0.04)' },
+          { value: 'fal-ai/bytedance/seedream/v4.5/text-to-image', label: 'Seedream 4.5 (4K, $0.06)' },
+        ]},
+        { key: 'width', label: 'Width', type: 'number', placeholder: '1024' },
+        { key: 'height', label: 'Height', type: 'number', placeholder: '1024' },
+      ];
+    case 'video_gen':
+      return [
+        { key: 'prompt', label: 'Video Prompt', type: 'textarea', placeholder: 'Describe the motion/action...', required: true },
+        { key: 'model', label: 'Model', type: 'select', required: true, options: [
+          { value: 'fal-ai/kling-video/o3/pro/image-to-video', label: 'Kling O3 Pro Image→Video ($0.95)' },
+          { value: 'fal-ai/kling-video/o3/pro/text-to-video', label: 'Kling O3 Pro Text→Video ($0.95)' },
+        ]},
+        { key: 'duration', label: 'Duration (seconds)', type: 'number', placeholder: '5' },
+        { key: 'firstFrameUrl', label: 'First Frame Image URL', type: 'text', placeholder: 'Optional input image' },
+      ];
+    case 'voice_gen':
+      return [
+        { key: 'text', label: 'Text to Speak', type: 'textarea', placeholder: 'Enter text for voiceover...', required: true },
+        { key: 'voice', label: 'Voice', type: 'select', options: [
+          { value: 'Rachel', label: 'Rachel (female)' }, { value: 'Adam', label: 'Adam (male)' },
+          { value: 'Bella', label: 'Bella (female)' }, { value: 'Charlie', label: 'Charlie (male)' },
+        ]},
+        { key: 'model', label: 'TTS Model', type: 'select', options: [
+          { value: 'fal-ai/elevenlabs/tts/turbo-v2.5', label: 'ElevenLabs Turbo v2.5 ($0.03)' },
         ]},
       ];
     // Video Pipeline nodes

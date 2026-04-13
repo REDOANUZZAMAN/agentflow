@@ -217,13 +217,21 @@ export async function POST(req: NextRequest) {
 
         // ─── PLAN MODE: simple conversation, no tools ───
         if (isPlanMode) {
-          const data = await callProxy(messages);
-          let text = '';
-          for (const block of (data.content || [])) {
-            if (block.type === 'text') text += block.text;
+          try {
+            const data = await callProxy(messages);
+            let text = '';
+            for (const block of (data.content || [])) {
+              if (block.type === 'text') text += block.text;
+            }
+            if (!text) text = 'I\'m here to help you plan! Could you tell me more about what you\'d like to create?';
+            send('text', { content: text });
+            send('done', { text, toolCalls: [], nodeIdMap: {}, workflowComplete: false });
+          } catch (planErr: any) {
+            console.error('[Plan mode error]', planErr.message);
+            const fallbackText = '🧠 I\'m in Plan mode and ready to help you brainstorm! Unfortunately I hit a temporary issue connecting to the AI. Please try again in a moment.';
+            send('text', { content: fallbackText });
+            send('done', { text: fallbackText, toolCalls: [], nodeIdMap: {}, workflowComplete: false });
           }
-          send('text', { content: text });
-          send('done', { text, toolCalls: [], nodeIdMap: {}, workflowComplete: false });
           controller.close();
           return;
         }

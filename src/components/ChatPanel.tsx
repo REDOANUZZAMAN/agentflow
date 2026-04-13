@@ -301,6 +301,14 @@ export default function ChatPanel() {
           dispatch({ type: 'COMPLETE_TASK', payload: tool.input.task_id as string });
         } else if (tool.name === 'fail_task' && tool.input?.task_id) {
           dispatch({ type: 'FAIL_TASK', payload: { id: tool.input.task_id as string, reason: (tool.input.reason as string) || 'Unknown error' } });
+        } else if (tool.name === 'update_node' && tool.result) {
+          const nodeId = streamNodeIdMap[tool.input.node_id] || tool.input.node_id;
+          const updateData: any = {};
+          if (tool.input.config) updateData.config = tool.input.config;
+          if (tool.input.label) updateData.label = tool.input.label;
+          if (tool.result.label) updateData.label = tool.result.label;
+          if (tool.result.config) updateData.config = { ...updateData.config, ...tool.result.config };
+          dispatch({ type: 'UPDATE_NODE', payload: { id: nodeId, data: updateData } });
         } else if (tool.name === 'workflow_ready') {
           dispatch({ type: 'ADD_TERMINAL_LOG', payload: { id: `tl_ready_${Date.now()}`, timestamp: new Date(), level: 'run', message: `[OK] Workflow ready: ${tool.input?.summary || 'Complete'}` } });
         } else if (tool.name === 'delete_node') {

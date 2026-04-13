@@ -223,7 +223,19 @@ export function reducer(state: AppState, action: Action): AppState {
       return {
         ...state,
         nodes: state.nodes.map((n) =>
-          n.id === action.payload.id ? { ...n, data: { ...n.data, ...action.payload.data } } : n
+          n.id === action.payload.id
+            ? {
+                ...n,
+                data: {
+                  ...n.data,
+                  ...action.payload.data,
+                  // Deep merge config so existing config fields aren't lost
+                  config: action.payload.data.config
+                    ? { ...(n.data.config || {}), ...action.payload.data.config }
+                    : n.data.config,
+                },
+              }
+            : n
         ),
       };
 

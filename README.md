@@ -289,23 +289,45 @@ npm install
 
 ### 3. Set up environment variables
 
-Create a `.env.local` file:
+Copy the example file and fill in your values:
+
+```bash
+cp .env.example .env.local
+```
+
+Or create `.env.local` manually with these variables:
 
 ```env
-# Supabase
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+# ─── Supabase (Required) ─────────────────────────────────────────
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
-# AI Providers (at least one required)
-ANTHROPIC_API_KEY=sk-ant-...           # Direct Claude access
-OPENROUTER_API_KEY=sk-or-...           # Multi-model fallback
+# ─── AI / LLM (At least one required) ───────────────────────────
+# Option A: Anthropic direct (if not blocked in your region)
+ANTHROPIC_API_KEY=sk-ant-...
 
-# Media Generation (for video pipeline)
-FAL_API_KEY=your_fal_key               # fal.ai image/video
-CLOUDINARY_CLOUD_NAME=your_cloud       # Media storage
-CLOUDINARY_API_KEY=your_key
-CLOUDINARY_API_SECRET=your_secret
+# Option B: OpenRouter proxy (recommended for restricted regions)
+OPENROUTER_API_KEY=sk-or-v1-...
+OPENROUTER_MODEL=deepseek/deepseek-chat-v3-0324
+
+# ─── fal.ai — Image / Video / Voice Generation ──────────────────
+# Required for running workflows that generate media
+FAL_API_KEY=your_fal_api_key_here
+
+# ─── Cloudinary — Asset Storage ──────────────────────────────────
+# Required for storing generated images, videos, and audio
+CLOUDINARY_CLOUD_NAME=your_cloud_name
+CLOUDINARY_API_KEY=123456789012345
+CLOUDINARY_API_SECRET=your_cloudinary_api_secret
+
+# ─── Railway Deployment (Optional) ──────────────────────────────
+# Service-account auth when anonymous signups are disabled
+RAILWAY_SERVICE_EMAIL=service@example.com
+RAILWAY_SERVICE_PASSWORD=your_service_password
 ```
+
+> **Note:** All secrets are loaded from environment variables only — no credentials are hardcoded in the codebase. See `.env.example` for the complete reference.
 
 ### 4. Set up the database
 

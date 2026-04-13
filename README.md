@@ -321,10 +321,7 @@ CLOUDINARY_CLOUD_NAME=your_cloud_name
 CLOUDINARY_API_KEY=123456789012345
 CLOUDINARY_API_SECRET=your_cloudinary_api_secret
 
-# ─── Railway Deployment (Optional) ──────────────────────────────
-# Service-account auth when anonymous signups are disabled
-RAILWAY_SERVICE_EMAIL=service@example.com
-RAILWAY_SERVICE_PASSWORD=your_service_password
+
 ```
 
 > **Note:** All secrets are loaded from environment variables only — no credentials are hardcoded in the codebase. See `.env.example` for the complete reference.

@@ -138,9 +138,29 @@ function sseEvent(event: string, data: any): string {
   return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
 }
 
+// Plan mode system prompt — no tools, just conversation
+const PLAN_MODE_SYSTEM_PROMPT = `You are the AgentFlow Planner — a friendly AI collaborator that helps non-technical users figure out WHAT they want to create before anything is built.
+
+## RULES
+1. You do NOT have access to canvas-editing tools. You CANNOT add nodes, run workflows, or generate anything.
+2. Your only job is conversation, writing, and planning.
+3. Ask clarifying questions when the user is vague — one question at a time.
+4. Use simple, plain English. No jargon. Be enthusiastic and supportive!
+5. Use emoji to make responses feel friendly.
+
+## WHEN WRITING SCRIPTS/PLANS
+Write in a clear format with TITLE, DESCRIPTION, ELEMENTS, STEPS/SHOTS, and ESTIMATED COST.
+
+## AFTER EVERY PLAN
+ALWAYS end with:
+"✅ **Does this look right?** Tell me what to change, or switch to **⚡ Act mode** when you're ready to build it!"
+
+Keep responses focused and conversational. You're a brainstorming partner, not a builder.`;
+
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { message, history, nodes, edges } = body;
+  const { message, history, nodes, edges, mode } = body;
+  const isPlanMode = mode === 'plan';
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
@@ -169,22 +189,43 @@ export async function POST(req: NextRequest) {
           messages[messages.length - 1] = { role: 'user', content: message + canvasContext };
         }
 
-        send('status', { phase: 'thinking', message: 'Planning your workflow...' });
+        send('status', { phase: 'thinking', message: isPlanMode ? 'Thinking about your plan...' : 'Planning your workflow...' });
 
-        // Proxy helper
+        // Proxy helper — uses plan mode prompt (no tools) or act mode prompt (with tools)
         async function callProxy(msgs: any[]) {
+          const proxyBody: Record<string, any> = {
+            messages: msgs,
+            system: isPlanMode ? PLAN_MODE_SYSTEM_PROMPT : SYSTEM_PROMPT,
+            model: 'claude-sonnet-4-6',
+            max_tokens: isPlanMode ? 4096 : 32768,
+          };
+          // Only include tools in Act mode — Plan mode is purely conversational
+          if (!isPlanMode) {
+            proxyBody.tools = TOOLS_FOR_CLAUDE;
+          }
+
           const res = await fetch(`${supabaseUrl}/functions/v1/claude-proxy`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${anonKey}` },
-            body: JSON.stringify({
-              messages: msgs, system: SYSTEM_PROMPT, tools: TOOLS_FOR_CLAUDE,
-              model: 'claude-sonnet-4-6', max_tokens: 32768,
-            }),
+            body: JSON.stringify(proxyBody),
           });
           if (!res.ok) throw new Error(`Proxy ${res.status}: ${await res.text()}`);
           const data = await res.json();
           if (data.error) throw new Error(data.error);
           return data;
+        }
+
+        // ─── PLAN MODE: simple conversation, no tools ───
+        if (isPlanMode) {
+          const data = await callProxy(messages);
+          let text = '';
+          for (const block of (data.content || [])) {
+            if (block.type === 'text') text += block.text;
+          }
+          send('text', { content: text });
+          send('done', { text, toolCalls: [], nodeIdMap: {}, workflowComplete: false });
+          controller.close();
+          return;
         }
 
         // Process a tool_use block

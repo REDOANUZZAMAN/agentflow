@@ -39,6 +39,10 @@ export interface AppState {
   taskList: Task[] | null;
   taskListCollapsed: boolean;
 
+  // Chat mode
+  chatMode: 'plan' | 'act';
+  confirmedPlan: string | null;
+
   // Terminal
   terminalLogs: TerminalLogEntry[];
 
@@ -84,6 +88,9 @@ export const initialState: AppState = {
   taskList: null,
   taskListCollapsed: false,
 
+  chatMode: 'plan',
+  confirmedPlan: null,
+
   terminalLogs: [],
 
   leftPanelWidth: 25,
@@ -127,6 +134,8 @@ export type Action =
   | { type: 'CLEAR_TASK_LIST' }
   | { type: 'AUTO_FIX_DEFAULTS' }
   | { type: 'AUTO_LAYOUT' }
+  | { type: 'SET_CHAT_MODE'; payload: 'plan' | 'act' }
+  | { type: 'SET_CONFIRMED_PLAN'; payload: string | null }
   // Terminal actions
   | { type: 'ADD_TERMINAL_LOG'; payload: TerminalLogEntry }
   | { type: 'CLEAR_TERMINAL_LOGS' }
@@ -398,6 +407,13 @@ export function reducer(state: AppState, action: Action): AppState {
       const layouted = dagreLayout(state.nodes, state.edges);
       return { ...state, nodes: layouted };
     }
+
+    // Chat mode
+    case 'SET_CHAT_MODE':
+      return { ...state, chatMode: action.payload };
+
+    case 'SET_CONFIRMED_PLAN':
+      return { ...state, confirmedPlan: action.payload };
 
     // Terminal actions
     case 'ADD_TERMINAL_LOG':

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, Sparkles, Bot, User, Loader2, Play } from 'lucide-react';
+import { Send, Sparkles, Bot, User, Loader2, Play, Brain, Zap, CheckCircle2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useParams } from 'next/navigation';
@@ -28,6 +28,18 @@ export default function ChatPanel() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [state.messages, state.isAiTyping]);
+
+  // Keyboard shortcut: Ctrl+Shift+M to toggle mode
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'M') {
+        e.preventDefault();
+        dispatch({ type: 'SET_CHAT_MODE', payload: state.chatMode === 'plan' ? 'act' : 'plan' });
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [state.chatMode, dispatch]);
 
   // Process tool calls from API response and apply to canvas
   const processToolCalls = useCallback((toolCalls: any[], nodeIdMap?: Record<string, string>) => {
@@ -275,19 +287,24 @@ export default function ChatPanel() {
     dispatch({ type: 'SET_AI_TYPING', payload: true });
 
     try {
-      // Use streaming endpoint for live sequential build
+      // Use streaming endpoint for live sequential build (only in Act mode)
+      const apiPayload = {
+        message: state.confirmedPlan && state.chatMode === 'act'
+          ? `<confirmed_plan>\n${state.confirmedPlan}\n</confirmed_plan>\n\n${message}`
+          : message,
+        history: [...state.messages, userMsg].map((m) => ({
+          role: m.role,
+          content: m.content,
+        })),
+        nodes: state.nodes,
+        edges: state.edges,
+        mode: state.chatMode,
+      };
+
       const response = await fetch('/api/chat/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message,
-          history: [...state.messages, userMsg].map((m) => ({
-            role: m.role,
-            content: m.content,
-          })),
-          nodes: state.nodes,
-          edges: state.edges,
-        }),
+        body: JSON.stringify(apiPayload),
       });
 
       if (!response.ok || !response.body) {
@@ -462,17 +479,61 @@ export default function ChatPanel() {
 
   return (
     <div className="flex flex-col h-full bg-[var(--background)]">
-      {/* Header */}
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--border)]">
-        <div className="w-8 h-8 rounded-lg bg-[var(--primary)] flex items-center justify-center">
-          <Sparkles className="w-4 h-4 text-white" />
+      {/* Header with Mode Toggle */}
+      <div className="px-4 py-3 border-b border-[var(--border)] space-y-2.5">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg bg-[var(--primary)] flex items-center justify-center">
+            <Sparkles className="w-4 h-4 text-white" />
+          </div>
+          <div className="flex-1">
+            <h2 className="text-sm font-semibold text-[var(--foreground)]">Builder Agent</h2>
+            <p className="text-xs text-[var(--muted-foreground)]">
+              {state.isAiTyping ? 'Thinking...' : state.chatMode === 'plan' ? 'Planning with you' : 'Ready to build'}
+            </p>
+          </div>
         </div>
-        <div>
-          <h2 className="text-sm font-semibold text-[var(--foreground)]">Builder Agent</h2>
-          <p className="text-xs text-[var(--muted-foreground)]">
-            {state.isAiTyping ? 'Thinking...' : 'Tell me what to build'}
-          </p>
+
+        {/* Plan / Act Mode Toggle */}
+        <div className="flex rounded-lg bg-[var(--secondary)]/50 p-0.5 border border-[var(--border)]">
+          <button
+            onClick={() => dispatch({ type: 'SET_CHAT_MODE', payload: 'plan' })}
+            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 ${
+              state.chatMode === 'plan'
+                ? 'bg-violet-600 text-white shadow-sm'
+                : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+            }`}
+            title="Plan Mode — brainstorm and refine before building (Ctrl+Shift+M)"
+          >
+            <Brain className="w-3.5 h-3.5" />
+            Plan
+          </button>
+          <button
+            onClick={() => dispatch({ type: 'SET_CHAT_MODE', payload: 'act' })}
+            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 ${
+              state.chatMode === 'act'
+                ? 'bg-amber-600 text-white shadow-sm'
+                : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+            }`}
+            title="Act Mode — build the workflow on the canvas now (Ctrl+Shift+M)"
+          >
+            <Zap className="w-3.5 h-3.5" />
+            Act
+          </button>
         </div>
+
+        {/* Confirmed plan banner */}
+        {state.confirmedPlan && state.chatMode === 'act' && (
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+            <span className="text-[10px] text-emerald-300 truncate">Plan confirmed — building from your approved plan</span>
+            <button
+              onClick={() => dispatch({ type: 'SET_CONFIRMED_PLAN', payload: null })}
+              className="text-[10px] text-[var(--muted-foreground)] hover:text-[var(--foreground)] ml-auto"
+            >
+              ✕
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Task List Card (pinned) */}
@@ -525,7 +586,7 @@ export default function ChatPanel() {
                 }
               });
             }}
-            placeholder="Tell me what you want your agent to do..."
+            placeholder={state.chatMode === 'plan' ? '🧠 Tell me what you want to create...' : '⚡ Tell me what to build on the canvas...'}
             className="flex-1 bg-transparent text-sm text-[var(--foreground)] placeholder-[var(--muted-foreground)] resize-y outline-none min-h-[36px] max-h-[300px] overflow-y-auto"
             rows={1}
             disabled={isSubmitting}

@@ -289,49 +289,6 @@ export default function ChatPanel() {
       // Queue for client-side pacing
       const toolEventQueue: any[] = [];
 
-      const processStreamedTool = (tool: any) => {
-        if (tool.name === 'add_node' && tool.result) {
-          const node = createNode(tool.result.type as NodeType, tool.result.config || {}, tool.result.position);
-          streamNodeIdMap[tool.result.nodeId] = node.id;
-          dispatch({ type: 'ADD_NODE', payload: node });
-        } else if (tool.name === 'connect_nodes' && tool.result) {
-          const fromId = streamNodeIdMap[tool.input.from_node_id] || tool.input.from_node_id;
-          const toId = streamNodeIdMap[tool.input.to_node_id] || tool.input.to_node_id;
-          const fromResult = streamToolCalls.find(t => t.name === 'add_node' && t.result?.nodeId === tool.input.from_node_id);
-          const toResult = streamToolCalls.find(t => t.name === 'add_node' && t.result?.nodeId === tool.input.to_node_id);
-          const actualFrom = fromResult ? streamNodeIdMap[fromResult.result.nodeId] : fromId;
-          const actualTo = toResult ? streamNodeIdMap[toResult.result.nodeId] : toId;
-          if (actualFrom && actualTo) {
-            dispatch({ type: 'ADD_EDGE', payload: createEdge(actualFrom, actualTo) });
-          }
-        } else if (tool.name === 'create_task_list' && tool.input?.tasks) {
-          // NEW WORKFLOW: Clear existing canvas before building
-          dispatch({ type: 'CLEAR_CANVAS' });
-          dispatch({ type: 'CREATE_TASK_LIST', payload: (tool.input.tasks as any[]).map((t: any) => ({ id: t.id, title: t.title, status: 'pending' as const })) });
-        } else if (tool.name === 'start_task' && tool.input?.task_id) {
-          dispatch({ type: 'START_TASK', payload: tool.input.task_id as string });
-        } else if (tool.name === 'complete_task' && tool.input?.task_id) {
-          dispatch({ type: 'COMPLETE_TASK', payload: tool.input.task_id as string });
-        } else if (tool.name === 'fail_task' && tool.input?.task_id) {
-          dispatch({ type: 'FAIL_TASK', payload: { id: tool.input.task_id as string, reason: (tool.input.reason as string) || 'Unknown error' } });
-        } else if (tool.name === 'update_node' && tool.result) {
-          const nodeId = streamNodeIdMap[tool.input.node_id] || tool.input.node_id;
-          const updateData: any = {};
-          if (tool.input.config) updateData.config = tool.input.config;
-          if (tool.input.label) updateData.label = tool.input.label;
-          if (tool.result.label) updateData.label = tool.result.label;
-          if (tool.result.config) updateData.config = { ...updateData.config, ...tool.result.config };
-          dispatch({ type: 'UPDATE_NODE', payload: { id: nodeId, data: updateData } });
-        } else if (tool.name === 'workflow_ready') {
-          dispatch({ type: 'ADD_TERMINAL_LOG', payload: { id: `tl_ready_${Date.now()}`, timestamp: new Date(), level: 'run', message: `[OK] Workflow ready: ${tool.input?.summary || 'Complete'}` } });
-        } else if (tool.name === 'delete_node') {
-          dispatch({ type: 'DELETE_NODE', payload: streamNodeIdMap[tool.input.node_id] || tool.input.node_id });
-        } else if (tool.name === 'run_workflow') {
-          simulateWorkflowRun();
-        }
-        streamToolCalls.push(tool);
-      };
-
       // Read the ENTIRE SSE stream first, collecting all events into the queue
       while (true) {
         const { done, value } = await reader.read();
@@ -357,6 +314,64 @@ export default function ChatPanel() {
           } else if (line === '') { currentEvent = ''; }
         }
       }
+
+      // SMART CANVAS CLEAR: Only clear if this is a NEW workflow build (has add_node calls).
+      // If Claude is UPDATING existing nodes, don't clear or we'll lose them!
+      const hasAddNodes = toolEventQueue.some(t => t.name === 'add_node');
+      const hasUpdateNodes = toolEventQueue.some(t => t.name === 'update_node');
+      const hasTaskList = toolEventQueue.some(t => t.name === 'create_task_list');
+      // Clear only if we have a task list AND add_nodes AND no update_nodes (= fresh build)
+      const shouldClearCanvas = hasTaskList && hasAddNodes && !hasUpdateNodes;
+
+      // Process a single tool event — dispatches to React store
+      const processStreamedTool = (tool: any) => {
+        if (tool.name === 'add_node' && tool.result && !tool.result.rejected && !tool.result.duplicate) {
+          const node = createNode(tool.result.type as NodeType, tool.result.config || {}, tool.result.position);
+          streamNodeIdMap[tool.result.nodeId] = node.id;
+          dispatch({ type: 'ADD_NODE', payload: node });
+          console.log('[AgentFlow] ADD_NODE:', tool.result.type, node.id, tool.result.position);
+        } else if (tool.name === 'connect_nodes' && tool.result) {
+          const fromId = streamNodeIdMap[tool.input.from_node_id] || tool.input.from_node_id;
+          const toId = streamNodeIdMap[tool.input.to_node_id] || tool.input.to_node_id;
+          const fromResult = streamToolCalls.find(t => t.name === 'add_node' && t.result?.nodeId === tool.input.from_node_id);
+          const toResult = streamToolCalls.find(t => t.name === 'add_node' && t.result?.nodeId === tool.input.to_node_id);
+          const actualFrom = fromResult ? streamNodeIdMap[fromResult.result.nodeId] : fromId;
+          const actualTo = toResult ? streamNodeIdMap[toResult.result.nodeId] : toId;
+          if (actualFrom && actualTo) {
+            dispatch({ type: 'ADD_EDGE', payload: createEdge(actualFrom, actualTo) });
+          }
+        } else if (tool.name === 'create_task_list' && tool.input?.tasks) {
+          if (shouldClearCanvas) {
+            dispatch({ type: 'CLEAR_CANVAS' });
+            console.log('[AgentFlow] CLEAR_CANVAS (fresh build)');
+          }
+          dispatch({ type: 'CREATE_TASK_LIST', payload: (tool.input.tasks as any[]).map((t: any) => ({ id: t.id, title: t.title, status: 'pending' as const })) });
+        } else if (tool.name === 'start_task' && tool.input?.task_id) {
+          dispatch({ type: 'START_TASK', payload: tool.input.task_id as string });
+        } else if (tool.name === 'complete_task' && tool.input?.task_id) {
+          dispatch({ type: 'COMPLETE_TASK', payload: tool.input.task_id as string });
+        } else if (tool.name === 'fail_task' && tool.input?.task_id) {
+          dispatch({ type: 'FAIL_TASK', payload: { id: tool.input.task_id as string, reason: (tool.input.reason as string) || 'Unknown error' } });
+        } else if (tool.name === 'update_node' && tool.result) {
+          const nodeId = streamNodeIdMap[tool.input.node_id] || tool.input.node_id;
+          const updateData: any = {};
+          if (tool.input.config) updateData.config = tool.input.config;
+          if (tool.input.label) updateData.label = tool.input.label;
+          if (tool.result.label) updateData.label = tool.result.label;
+          if (tool.result.config) updateData.config = { ...updateData.config, ...tool.result.config };
+          dispatch({ type: 'UPDATE_NODE', payload: { id: nodeId, data: updateData } });
+          console.log('[AgentFlow] UPDATE_NODE:', nodeId, updateData);
+        } else if (tool.name === 'workflow_ready') {
+          dispatch({ type: 'ADD_TERMINAL_LOG', payload: { id: `tl_ready_${Date.now()}`, timestamp: new Date(), level: 'run', message: `[OK] Workflow ready: ${tool.input?.summary || 'Complete'}` } });
+        } else if (tool.name === 'delete_node') {
+          dispatch({ type: 'DELETE_NODE', payload: streamNodeIdMap[tool.input.node_id] || tool.input.node_id });
+        } else if (tool.name === 'run_workflow') {
+          simulateWorkflowRun();
+        }
+        streamToolCalls.push(tool);
+      };
+
+      console.log('[AgentFlow] Queue ready:', toolEventQueue.length, 'events. shouldClear:', shouldClearCanvas, 'hasAdd:', hasAddNodes, 'hasUpdate:', hasUpdateNodes);
 
       // Now process the queued tool events ONE BY ONE with client-side pacing
       for (let i = 0; i < toolEventQueue.length; i++) {

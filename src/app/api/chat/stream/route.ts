@@ -53,10 +53,16 @@ All node configs must be filled with REAL content from the user's request, not p
 
 - voiceover_generator: "text" MUST contain the actual narration/dialogue for that specific shot.
   Extract it from the user's script. If no script, WRITE appropriate narration based on the scene.
-  CRITICAL: Keep voiceover text SHORT — max ~12 words per 5s video clip (~2.5 words/second).
-  If the text is longer, the engine auto-speeds it up (max 1.2x), but very long text will still overflow.
-  Split long narration across multiple shots instead of cramming into one.
-  add_node(type: "voiceover_generator", config: { sceneNumber: 1, shotNumber: 1, text: "She stepped off the train into the cold morning air.", voice: "Rachel", duration: 5 })
+  CRITICAL: Text length MUST match the video duration! Use ~2.5 words per second:
+    - 5s video → ~12 words of narration
+    - 10s video → ~25 words of narration  
+    - 12s video → ~30 words of narration
+    - 15s video → ~37 words of narration
+  The "duration" field in voiceover config MUST match the corresponding video_generator duration.
+  If video duration is 10, voiceover duration MUST also be 10 — NOT 5!
+  If the text is too long, the engine auto-speeds it up. If too short, it auto-slows down.
+  But it's MUCH better to write the right amount of text than rely on speed adjustment.
+  add_node(type: "voiceover_generator", config: { sceneNumber: 1, shotNumber: 1, text: "She stepped off the train into the cold morning air. The platform was empty, the fog rolling in from the river, muffling every sound. She pulled her coat tighter and looked around.", voice: "Rachel", duration: 12 })
 
 - photo_generator: "prompt" must describe the specific visual content of that shot in detail.
   add_node(type: "photo_generator", config: { sceneNumber: 1, shotNumber: 1, prompt: "A young woman in a red coat stepping off a vintage train onto a foggy platform, cinematic lighting" })

@@ -407,19 +407,24 @@ async function executeVoiceoverGenerator(node: WorkflowNode, ctx: ExecutionConte
   const naturalDuration = wordCount / WORDS_PER_SEC;
   const targetDuration = node.data.config.targetDuration || node.data.config.duration || 5; // default 5s per shot
   let autoSpeed = 1.0;
-  if (naturalDuration > targetDuration && targetDuration > 0) {
-    autoSpeed = Math.min(naturalDuration / targetDuration, 1.2); // ElevenLabs max is 1.2
+  if (targetDuration > 0 && naturalDuration > 0) {
+    if (naturalDuration > targetDuration) {
+      // Text too long → speed up (max 1.2x for ElevenLabs)
+      autoSpeed = Math.min(naturalDuration / targetDuration, 1.2);
+    } else if (naturalDuration < targetDuration * 0.6) {
+      // Text too short → slow down to fill more of the clip (min 0.7x)
+      // Only slow down if the audio would cover less than 60% of the clip
+      autoSpeed = Math.max(naturalDuration / targetDuration, 0.7);
+    }
   }
-  const finalSpeed = configSpeed || (autoSpeed > 1.0 ? autoSpeed : undefined);
+  const finalSpeed = configSpeed || (autoSpeed !== 1.0 ? autoSpeed : undefined);
 
   ctx.emit({ type: 'log', nodeId: node.id, data: { 
-    message: `[voice] Generating voiceover via ${falModel}... Text: "${voiceText.substring(0, 80)}${voiceText.length > 80 ? '...' : ''}"` 
+    message: `[voice] Generating voiceover via ${falModel}... Text (${wordCount} words): "${voiceText.substring(0, 100)}${voiceText.length > 100 ? '...' : ''}"` 
   }});
-  if (finalSpeed && finalSpeed > 1.0) {
-    ctx.emit({ type: 'log', nodeId: node.id, data: { 
-      message: `⏩ Auto-speed: ${finalSpeed.toFixed(2)}x (${wordCount} words, ~${naturalDuration.toFixed(1)}s natural → target ${targetDuration}s)`
-    }});
-  }
+  ctx.emit({ type: 'log', nodeId: node.id, data: { 
+    message: `[timer] Natural: ~${naturalDuration.toFixed(1)}s | Target: ${targetDuration}s | Speed: ${(finalSpeed || 1.0).toFixed(2)}x${autoSpeed < 1.0 ? ' (slowed to fill clip)' : autoSpeed > 1.0 ? ' (sped up to fit)' : ''}`
+  }});
 
   // Build input based on model type
   let input: any;

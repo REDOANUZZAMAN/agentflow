@@ -62,9 +62,9 @@ export default function TaskListCard() {
         )}
       </button>
 
-      {/* Task items */}
+      {/* Task items — scrollable when list is long */}
       {!taskListCollapsed && (
-        <div className="px-3 pb-3 space-y-0.5">
+        <div className="px-3 pb-3 space-y-0.5 max-h-[280px] overflow-y-auto scrollbar-thin scrollbar-thumb-[var(--border)] scrollbar-track-transparent">
           {taskList.map((task, idx) => (
             <TaskItem key={task.id} task={task} index={idx + 1} />
           ))}

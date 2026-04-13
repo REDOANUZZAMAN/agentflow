@@ -258,56 +258,59 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        // Smart grid position calculator — uses sequential column index per type
-        const COL_W = 280;
-        const ROW_H = 180;
+        // Smart grid position calculator — uses shot-based column layout
+        const COL_W = 250;
+        const ROW_H = 160;
+        const GRID_START_X = 100;
+
+        // Helper: count total shot columns (based on photo_generators as reference)
+        function getMaxShotCols(): number {
+          const existingAddNodes = allToolCalls.filter(c => c.name === 'add_node' && c.result && !c.result.duplicate && !c.result.rejected);
+          const photoCount = existingAddNodes.filter(c => c.result?.type === 'photo_generator').length
+            + (nodes || []).filter((n: any) => n.data?.type === 'photo_generator').length;
+          const videoCount = existingAddNodes.filter(c => ['video_generator', 'video_gen'].includes(c.result?.type)).length
+            + (nodes || []).filter((n: any) => ['video_generator', 'video_gen'].includes(n.data?.type)).length;
+          return Math.max(photoCount, videoCount, 1);
+        }
+
+        // Center X for single nodes (trigger, orchestrator, compiler)
+        function centerX(): number {
+          const cols = getMaxShotCols();
+          return GRID_START_X + Math.floor((cols - 1) / 2) * COL_W;
+        }
+
         function calcPosition(type: string, config: any): { x: number; y: number } {
           const existingAddNodes = allToolCalls.filter(c => c.name === 'add_node' && c.result && !c.result.duplicate && !c.result.rejected);
-          // Count how many of the SAME type already exist (including pre-existing canvas nodes)
           const existingCanvasOfType = (nodes || []).filter((n: any) => n.data?.type === type).length;
 
           switch (type) {
             case 'manual_trigger':
             case 'schedule_trigger':
             case 'webhook_trigger':
-              return { x: 500, y: 0 };
+              return { x: centerX(), y: 0 };
             case 'element_reference': {
               const elemIdx = existingAddNodes.filter(c => c.result?.type === 'element_reference').length + existingCanvasOfType;
-              return { x: 150 + elemIdx * COL_W, y: ROW_H };
+              return { x: GRID_START_X + elemIdx * COL_W, y: ROW_H };
             }
             case 'photo_generator':
             case 'image_gen': {
-              // Use sequential column index — each new photo goes to next column
               const colIdx = existingAddNodes.filter(c => c.result?.type === type).length + existingCanvasOfType;
-              return { x: 150 + colIdx * COL_W, y: 2 * ROW_H };
+              return { x: GRID_START_X + colIdx * COL_W, y: 2 * ROW_H };
             }
             case 'video_generator':
             case 'video_gen': {
               const colIdx = existingAddNodes.filter(c => c.result?.type === type || c.result?.type === 'video_gen').length + existingCanvasOfType;
-              return { x: 150 + colIdx * COL_W, y: 3 * ROW_H };
+              return { x: GRID_START_X + colIdx * COL_W, y: 3 * ROW_H };
             }
             case 'voiceover_generator':
             case 'voice_gen': {
               const colIdx = existingAddNodes.filter(c => c.result?.type === type || c.result?.type === 'voice_gen').length + existingCanvasOfType;
-              return { x: 150 + colIdx * COL_W, y: 4 * ROW_H };
+              return { x: GRID_START_X + colIdx * COL_W, y: 4 * ROW_H };
             }
-            case 'project_orchestrator': {
-              // Center orchestrator based on how many columns we have
-              const maxCols = Math.max(
-                existingAddNodes.filter(c => c.result?.type === 'photo_generator').length,
-                existingAddNodes.filter(c => ['video_generator', 'video_gen'].includes(c.result?.type)).length,
-                1
-              );
-              return { x: 150 + Math.floor((maxCols - 1) / 2) * COL_W, y: 5 * ROW_H };
-            }
-            case 'final_video_compiler': {
-              const maxCols = Math.max(
-                existingAddNodes.filter(c => c.result?.type === 'photo_generator').length,
-                existingAddNodes.filter(c => ['video_generator', 'video_gen'].includes(c.result?.type)).length,
-                1
-              );
-              return { x: 150 + Math.floor((maxCols - 1) / 2) * COL_W, y: 6 * ROW_H };
-            }
+            case 'project_orchestrator':
+              return { x: centerX(), y: 5 * ROW_H };
+            case 'final_video_compiler':
+              return { x: centerX(), y: 6 * ROW_H };
             default: {
               const idx = existingAddNodes.length;
               return { x: 300, y: 80 + idx * 150 };
@@ -399,6 +402,8 @@ export async function POST(req: NextRequest) {
         const MAX_ROUNDS = 15;
         const MAX_CONTINUATIONS = 8;
         let continuationCount = 0;
+        let globalTaskIdx = 0; // Persists across rounds — prevents task list from looping
+        const completedTaskIds = new Set<string>(); // Track which tasks have been ticked
 
         for (let round = 0; round < MAX_ROUNDS; round++) {
           const data = await callProxy(currentMessages);
@@ -414,15 +419,21 @@ export async function POST(req: NextRequest) {
 
           if (tools.length === 0 && data.stop_reason !== 'tool_use') {
             // No tools — check if we should auto-continue
-            const addNodeCount = allToolCalls.filter(t => t.name === 'add_node').length;
-            const deficit = plannedTaskCount > 0 ? plannedTaskCount - addNodeCount : 0;
-            if (addNodeCount >= 1 && !workflowComplete && continuationCount < MAX_CONTINUATIONS && deficit > 0) {
+            const addNodeCount = allToolCalls.filter(t => t.name === 'add_node' && t.result && !t.result.rejected && !t.result.duplicate).length;
+            const primaryCount = allToolCalls.filter(t => ['add_node', 'update_node', 'delete_node'].includes(t.name)).length;
+            const deficit = plannedTaskCount > 0 ? plannedTaskCount - primaryCount : 0;
+            if (primaryCount >= 1 && !workflowComplete && continuationCount < MAX_CONTINUATIONS && deficit > 0) {
               continuationCount++;
+              // Build specific info about what's missing
+              const existingShots = new Set(
+                allToolCalls.filter(t => t.name === 'add_node' && t.result?.config?.shotNumber)
+                  .map(t => `${t.result.type}:s${t.result.config.sceneNumber}:sh${t.result.config.shotNumber}`)
+              );
               send('status', { phase: 'continuing', message: `Building... (${addNodeCount} nodes, ${deficit} remaining)` });
               currentMessages = [
                 ...currentMessages,
                 { role: 'assistant', content: data.content },
-                { role: 'user', content: `You have ${addNodeCount} nodes but need ${plannedTaskCount}. Continue adding the remaining ${deficit} nodes NOW with add_node calls. Then connect them all and call workflow_ready().` },
+                { role: 'user', content: `INCOMPLETE: You created ${addNodeCount} nodes but the task list needs ${plannedTaskCount} steps total (${deficit} remaining). Existing shots: ${[...existingShots].join(', ') || 'none'}. Continue adding the REMAINING nodes NOW with add_node calls. Then connect ALL nodes and call workflow_ready(). DO NOT re-create existing shots.` },
               ];
               continue;
             }
@@ -447,86 +458,70 @@ export async function POST(req: NextRequest) {
             await sleep(50);
           }
 
-          // Stream primary tools (add_node, update_node, delete_node) with synthetic task events
-          // PACING: Each task gets ~1s visible cycle: start(300ms) → tool(600ms) → complete(300ms)
-          let taskIdx = 0;
+          // Stream primary tools with synthetic task events using GLOBAL task index
+          // (persists across rounds — prevents task list from re-cycling)
           for (const toolBlock of primaryTools) {
-            // Synthetic: start corresponding task (shows "running" spinner)
-            if (taskList.length > 0 && taskIdx < taskList.length) {
+            // Synthetic: start next uncompleted task
+            if (taskList.length > 0 && globalTaskIdx < taskList.length && !completedTaskIds.has(taskList[globalTaskIdx].id)) {
               send('tool', {
-                id: `syn_start_${taskList[taskIdx].id}`, name: 'start_task',
-                input: { task_id: taskList[taskIdx].id },
-                result: { success: true, task_id: taskList[taskIdx].id, status: 'running' },
+                id: `syn_start_${taskList[globalTaskIdx].id}_r${round}`, name: 'start_task',
+                input: { task_id: taskList[globalTaskIdx].id },
+                result: { success: true, task_id: taskList[globalTaskIdx].id, status: 'running' },
                 status: 'done',
               });
-              await sleep(300); // Let user SEE the "running" state
+              await sleep(100);
             }
 
             // Real tool call (node appears on canvas)
             const processed = processToolBlock(toolBlock);
             send('tool', processed);
-            await sleep(toolBlock.name === 'add_node' ? 600 : 400); // Satisfying pace
+            await sleep(100);
 
-            // Synthetic: complete corresponding task (shows green checkmark)
-            if (taskList.length > 0 && taskIdx < taskList.length) {
+            // Synthetic: complete task
+            if (taskList.length > 0 && globalTaskIdx < taskList.length && !completedTaskIds.has(taskList[globalTaskIdx].id)) {
+              completedTaskIds.add(taskList[globalTaskIdx].id);
               send('tool', {
-                id: `syn_complete_${taskList[taskIdx].id}`, name: 'complete_task',
-                input: { task_id: taskList[taskIdx].id },
-                result: { success: true, task_id: taskList[taskIdx].id, status: 'done' },
+                id: `syn_complete_${taskList[globalTaskIdx].id}_r${round}`, name: 'complete_task',
+                input: { task_id: taskList[globalTaskIdx].id },
+                result: { success: true, task_id: taskList[globalTaskIdx].id, status: 'done' },
                 status: 'done',
               });
-              taskIdx++;
-              await sleep(200); // Brief pause before next task starts
+              globalTaskIdx++;
+              await sleep(50);
             }
           }
 
-          // Stream connect_nodes calls (faster pacing, group under one task)
+          // Stream connect_nodes calls (group under one task)
           if (connectTools.length > 0) {
-            if (taskList.length > 0 && taskIdx < taskList.length) {
+            if (taskList.length > 0 && globalTaskIdx < taskList.length && !completedTaskIds.has(taskList[globalTaskIdx].id)) {
               send('tool', {
-                id: `syn_start_${taskList[taskIdx].id}`, name: 'start_task',
-                input: { task_id: taskList[taskIdx].id },
-                result: { success: true, task_id: taskList[taskIdx].id, status: 'running' },
+                id: `syn_start_${taskList[globalTaskIdx].id}_r${round}`, name: 'start_task',
+                input: { task_id: taskList[globalTaskIdx].id },
+                result: { success: true, task_id: taskList[globalTaskIdx].id, status: 'running' },
                 status: 'done',
               });
-              await sleep(200);
+              await sleep(50);
             }
             for (const toolBlock of connectTools) {
               const processed = processToolBlock(toolBlock);
               send('tool', processed);
-              await sleep(200); // Each connection visibly appears
+              await sleep(50);
             }
-            if (taskList.length > 0 && taskIdx < taskList.length) {
+            if (taskList.length > 0 && globalTaskIdx < taskList.length && !completedTaskIds.has(taskList[globalTaskIdx].id)) {
+              completedTaskIds.add(taskList[globalTaskIdx].id);
               send('tool', {
-                id: `syn_complete_${taskList[taskIdx].id}`, name: 'complete_task',
-                input: { task_id: taskList[taskIdx].id },
-                result: { success: true, task_id: taskList[taskIdx].id, status: 'done' },
+                id: `syn_complete_${taskList[globalTaskIdx].id}_r${round}`, name: 'complete_task',
+                input: { task_id: taskList[globalTaskIdx].id },
+                result: { success: true, task_id: taskList[globalTaskIdx].id, status: 'done' },
                 status: 'done',
               });
-              taskIdx++;
-              await sleep(200);
+              globalTaskIdx++;
+              await sleep(50);
             }
           }
 
-          // Complete any remaining tasks that weren't matched to tool calls
-          // (e.g. if task list had more items than actual tool calls)
-          while (taskList.length > 0 && taskIdx < taskList.length) {
-            send('tool', {
-              id: `syn_start_${taskList[taskIdx].id}`, name: 'start_task',
-              input: { task_id: taskList[taskIdx].id },
-              result: { success: true, task_id: taskList[taskIdx].id, status: 'running' },
-              status: 'done',
-            });
-            await sleep(300); // Visible "running" state
-            send('tool', {
-              id: `syn_complete_${taskList[taskIdx].id}`, name: 'complete_task',
-              input: { task_id: taskList[taskIdx].id },
-              result: { success: true, task_id: taskList[taskIdx].id, status: 'done' },
-              status: 'done',
-            });
-            taskIdx++;
-            await sleep(200); // Pause before next
-          }
+          // DON'T auto-complete remaining tasks here — they'll be completed in future rounds
+          // Only auto-complete if this is the FINAL round (workflow complete or no more continuation)
 
           // Process remaining meta tools (workflow_ready, etc.)
           for (const t of metaTools.filter(t => t.name !== 'create_task_list' && t.name !== 'list_nodes')) {
@@ -555,16 +550,21 @@ export async function POST(req: NextRequest) {
           }
 
           if (data.stop_reason !== 'tool_use') {
-            // Check auto-continuation
-            const addNodeCount = allToolCalls.filter(t => t.name === 'add_node').length;
-            const deficit = plannedTaskCount > 0 ? plannedTaskCount - addNodeCount : 0;
+            // Check auto-continuation with specific shot info
+            const addNodeCount = allToolCalls.filter(t => t.name === 'add_node' && t.result && !t.result.rejected && !t.result.duplicate).length;
+            const primaryCount = allToolCalls.filter(t => ['add_node', 'update_node', 'delete_node'].includes(t.name)).length;
+            const deficit = plannedTaskCount > 0 ? plannedTaskCount - primaryCount : 0;
             if (!workflowComplete && continuationCount < MAX_CONTINUATIONS && deficit > 0) {
               continuationCount++;
+              const existingShots = new Set(
+                allToolCalls.filter(t => t.name === 'add_node' && t.result?.config?.shotNumber)
+                  .map(t => `${t.result.type}:s${t.result.config.sceneNumber}:sh${t.result.config.shotNumber}`)
+              );
               send('status', { phase: 'continuing', message: `Continuing... (${addNodeCount}/${plannedTaskCount} nodes)` });
               currentMessages = [
                 ...currentMessages,
                 { role: 'assistant', content: data.content },
-                { role: 'user', content: `Good progress! ${addNodeCount} nodes created, ${deficit} more needed. Continue with more add_node calls, then connect_nodes, then workflow_ready().` },
+                { role: 'user', content: `INCOMPLETE: ${addNodeCount} nodes created, ${deficit} more steps needed. Existing shots: ${[...existingShots].join(', ') || 'none'}. Add the REMAINING nodes NOW, then connect ALL nodes, then call workflow_ready().` },
               ];
               continue;
             }
@@ -573,6 +573,17 @@ export async function POST(req: NextRequest) {
 
           // stop_reason === 'tool_use' — continue with results
           currentMessages = [...currentMessages, { role: 'assistant', content: data.content }, { role: 'user', content: toolResults }];
+        }
+
+        // Auto-complete any remaining tasks that weren't ticked during rounds
+        while (taskList.length > 0 && globalTaskIdx < taskList.length) {
+          const tid = taskList[globalTaskIdx].id;
+          if (!completedTaskIds.has(tid)) {
+            send('tool', { id: `syn_start_${tid}_final`, name: 'start_task', input: { task_id: tid }, result: { success: true, task_id: tid, status: 'running' }, status: 'done' });
+            send('tool', { id: `syn_complete_${tid}_final`, name: 'complete_task', input: { task_id: tid }, result: { success: true, task_id: tid, status: 'done' }, status: 'done' });
+            completedTaskIds.add(tid);
+          }
+          globalTaskIdx++;
         }
 
         // Generate narrative if no text

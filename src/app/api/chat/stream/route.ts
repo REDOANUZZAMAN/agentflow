@@ -434,20 +434,22 @@ export async function POST(req: NextRequest) {
           send('status', { phase: 'building', message: `Building...` });
 
           // Separate tool calls into categories for smart pacing
-          const addNodeTools = tools.filter(t => t.name === 'add_node');
+          // "Primary" tools = any actionable tool that should count toward task progress
+          const primaryToolNames = ['add_node', 'update_node', 'delete_node'];
+          const primaryTools = tools.filter(t => primaryToolNames.includes(t.name));
           const connectTools = tools.filter(t => t.name === 'connect_nodes');
-          const otherTools = tools.filter(t => t.name !== 'add_node' && t.name !== 'connect_nodes');
+          const metaTools = tools.filter(t => !primaryToolNames.includes(t.name) && t.name !== 'connect_nodes');
 
-          // Process create_task_list first (instantly)
-          for (const t of otherTools.filter(t => t.name === 'create_task_list')) {
+          // Process create_task_list and list_nodes first (instantly)
+          for (const t of metaTools.filter(t => t.name === 'create_task_list' || t.name === 'list_nodes')) {
             const processed = processToolBlock(t);
             send('tool', processed);
             await sleep(50);
           }
 
-          // Now stream add_node calls with synthetic task events
+          // Stream primary tools (add_node, update_node, delete_node) with synthetic task events
           let taskIdx = 0;
-          for (const toolBlock of addNodeTools) {
+          for (const toolBlock of primaryTools) {
             // Synthetic: start corresponding task
             if (taskList.length > 0 && taskIdx < taskList.length) {
               send('tool', {
@@ -459,10 +461,10 @@ export async function POST(req: NextRequest) {
               await sleep(100);
             }
 
-            // Real add_node
+            // Real tool call
             const processed = processToolBlock(toolBlock);
             send('tool', processed);
-            await sleep(350); // Satisfying pace
+            await sleep(toolBlock.name === 'add_node' ? 350 : 200);
 
             // Synthetic: complete corresponding task
             if (taskList.length > 0 && taskIdx < taskList.length) {
@@ -494,8 +496,8 @@ export async function POST(req: NextRequest) {
               send('tool', processed);
               await sleep(150);
             }
-            // Complete remaining tasks
-            while (taskIdx < taskList.length) {
+            // Complete connection task
+            if (taskList.length > 0 && taskIdx < taskList.length) {
               send('tool', {
                 id: `syn_complete_${taskList[taskIdx].id}`, name: 'complete_task',
                 input: { task_id: taskList[taskIdx].id },
@@ -507,8 +509,27 @@ export async function POST(req: NextRequest) {
             }
           }
 
-          // Process remaining other tools (workflow_ready, etc.)
-          for (const t of otherTools.filter(t => t.name !== 'create_task_list')) {
+          // Complete any remaining tasks that weren't matched to tool calls
+          while (taskList.length > 0 && taskIdx < taskList.length) {
+            send('tool', {
+              id: `syn_start_${taskList[taskIdx].id}`, name: 'start_task',
+              input: { task_id: taskList[taskIdx].id },
+              result: { success: true, task_id: taskList[taskIdx].id, status: 'running' },
+              status: 'done',
+            });
+            await sleep(50);
+            send('tool', {
+              id: `syn_complete_${taskList[taskIdx].id}`, name: 'complete_task',
+              input: { task_id: taskList[taskIdx].id },
+              result: { success: true, task_id: taskList[taskIdx].id, status: 'done' },
+              status: 'done',
+            });
+            taskIdx++;
+            await sleep(50);
+          }
+
+          // Process remaining meta tools (workflow_ready, etc.)
+          for (const t of metaTools.filter(t => t.name !== 'create_task_list' && t.name !== 'list_nodes')) {
             const processed = processToolBlock(t);
             send('tool', processed);
             await sleep(50);

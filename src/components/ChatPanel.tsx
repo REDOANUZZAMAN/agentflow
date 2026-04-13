@@ -294,6 +294,8 @@ export default function ChatPanel() {
             dispatch({ type: 'ADD_EDGE', payload: createEdge(actualFrom, actualTo) });
           }
         } else if (tool.name === 'create_task_list' && tool.input?.tasks) {
+          // NEW WORKFLOW: Clear existing canvas before building
+          dispatch({ type: 'CLEAR_CANVAS' });
           dispatch({ type: 'CREATE_TASK_LIST', payload: (tool.input.tasks as any[]).map((t: any) => ({ id: t.id, title: t.title, status: 'pending' as const })) });
         } else if (tool.name === 'start_task' && tool.input?.task_id) {
           dispatch({ type: 'START_TASK', payload: tool.input.task_id as string });

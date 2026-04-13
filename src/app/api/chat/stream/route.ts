@@ -448,9 +448,10 @@ export async function POST(req: NextRequest) {
           }
 
           // Stream primary tools (add_node, update_node, delete_node) with synthetic task events
+          // PACING: Each task gets ~1s visible cycle: start(300ms) → tool(600ms) → complete(300ms)
           let taskIdx = 0;
           for (const toolBlock of primaryTools) {
-            // Synthetic: start corresponding task
+            // Synthetic: start corresponding task (shows "running" spinner)
             if (taskList.length > 0 && taskIdx < taskList.length) {
               send('tool', {
                 id: `syn_start_${taskList[taskIdx].id}`, name: 'start_task',
@@ -458,15 +459,15 @@ export async function POST(req: NextRequest) {
                 result: { success: true, task_id: taskList[taskIdx].id, status: 'running' },
                 status: 'done',
               });
-              await sleep(100);
+              await sleep(300); // Let user SEE the "running" state
             }
 
-            // Real tool call
+            // Real tool call (node appears on canvas)
             const processed = processToolBlock(toolBlock);
             send('tool', processed);
-            await sleep(toolBlock.name === 'add_node' ? 350 : 200);
+            await sleep(toolBlock.name === 'add_node' ? 600 : 400); // Satisfying pace
 
-            // Synthetic: complete corresponding task
+            // Synthetic: complete corresponding task (shows green checkmark)
             if (taskList.length > 0 && taskIdx < taskList.length) {
               send('tool', {
                 id: `syn_complete_${taskList[taskIdx].id}`, name: 'complete_task',
@@ -475,13 +476,12 @@ export async function POST(req: NextRequest) {
                 status: 'done',
               });
               taskIdx++;
-              await sleep(100);
+              await sleep(200); // Brief pause before next task starts
             }
           }
 
-          // Stream connect_nodes calls (faster pacing)
+          // Stream connect_nodes calls (faster pacing, group under one task)
           if (connectTools.length > 0) {
-            // Synthetic: start "connect" task if available
             if (taskList.length > 0 && taskIdx < taskList.length) {
               send('tool', {
                 id: `syn_start_${taskList[taskIdx].id}`, name: 'start_task',
@@ -489,14 +489,13 @@ export async function POST(req: NextRequest) {
                 result: { success: true, task_id: taskList[taskIdx].id, status: 'running' },
                 status: 'done',
               });
-              await sleep(100);
+              await sleep(200);
             }
             for (const toolBlock of connectTools) {
               const processed = processToolBlock(toolBlock);
               send('tool', processed);
-              await sleep(150);
+              await sleep(200); // Each connection visibly appears
             }
-            // Complete connection task
             if (taskList.length > 0 && taskIdx < taskList.length) {
               send('tool', {
                 id: `syn_complete_${taskList[taskIdx].id}`, name: 'complete_task',
@@ -505,11 +504,12 @@ export async function POST(req: NextRequest) {
                 status: 'done',
               });
               taskIdx++;
-              await sleep(50);
+              await sleep(200);
             }
           }
 
           // Complete any remaining tasks that weren't matched to tool calls
+          // (e.g. if task list had more items than actual tool calls)
           while (taskList.length > 0 && taskIdx < taskList.length) {
             send('tool', {
               id: `syn_start_${taskList[taskIdx].id}`, name: 'start_task',
@@ -517,7 +517,7 @@ export async function POST(req: NextRequest) {
               result: { success: true, task_id: taskList[taskIdx].id, status: 'running' },
               status: 'done',
             });
-            await sleep(50);
+            await sleep(300); // Visible "running" state
             send('tool', {
               id: `syn_complete_${taskList[taskIdx].id}`, name: 'complete_task',
               input: { task_id: taskList[taskIdx].id },
@@ -525,7 +525,7 @@ export async function POST(req: NextRequest) {
               status: 'done',
             });
             taskIdx++;
-            await sleep(50);
+            await sleep(200); // Pause before next
           }
 
           // Process remaining meta tools (workflow_ready, etc.)

@@ -144,7 +144,9 @@ export type Action =
   | { type: 'UNDO' }
   | { type: 'REDO' }
   // Multi-select delete
-  | { type: 'DELETE_SELECTED'; payload: { nodeIds: string[]; edgeIds: string[] } };
+  | { type: 'DELETE_SELECTED'; payload: { nodeIds: string[]; edgeIds: string[] } }
+  // Clear canvas for new workflow
+  | { type: 'CLEAR_CANVAS' };
 
 // Helper: push current nodes/edges to history stack
 function pushHistory(state: AppState): { history: HistorySnapshot[]; future: HistorySnapshot[] } {
@@ -444,6 +446,12 @@ export function reducer(state: AppState, action: Action): AppState {
             : l
         ),
       };
+
+    // Clear canvas before building a new workflow
+    case 'CLEAR_CANVAS': {
+      const hist = pushHistory(state);
+      return { ...state, ...hist, nodes: [], edges: [], selectedNodeId: null };
+    }
 
     default:
       return state;

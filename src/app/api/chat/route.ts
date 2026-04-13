@@ -862,7 +862,8 @@ async function callClaudeAPI(message: string, history: any[], nodes: any[], edge
             const nodeId = `node_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
             const position = (toolInput.position as { x: number; y: number }) || {
               x: 300,
-              y: 80 + (nodes.length + toolCalls.filter((t: any) => t.name === 'add_node').length) * 150,
+              y: 80 + (nodes.length + toolCalls.filter((t: any) => t.name === 'add_node').length) * 160,
+              y: 150,
             };
             
             // AUTO-FILL: Apply schema defaults to any missing required fields
@@ -1013,7 +1014,7 @@ function buildJokeEmailWorkflow(existingNodes: any[]) {
         label: 'Schedule',
         emoji: '[clock]',
         config: { schedule: 'every day at 8am', cron: '0 8 * * *' },
-        position: { x: 300, y: baseY },
+        position: { x: 80, y: 150 },
       },
       status: 'done',
     },
@@ -1027,7 +1028,7 @@ function buildJokeEmailWorkflow(existingNodes: any[]) {
         label: 'Claude AI',
         emoji: '[brain]',
         config: { prompt: 'Tell me a funny, family-friendly joke. Be creative and surprising!', model: 'claude-sonnet-4-6' },
-        position: { x: 300, y: baseY + 150 },
+        position: { x: 240, y: 150 },
       },
       status: 'done',
     },
@@ -1041,7 +1042,7 @@ function buildJokeEmailWorkflow(existingNodes: any[]) {
         label: 'Send Email',
         emoji: '[email]',
         config: { subject: '[joke] Your Daily Joke', to: 'you@example.com' },
-        position: { x: 300, y: baseY + 300 },
+        position: { x: 400, y: 150 },
       },
       status: 'done',
     },
@@ -1081,25 +1082,25 @@ function buildNewsSummaryWorkflow(existingNodes: any[]) {
     {
       id: 'tc_1', name: 'add_node',
       input: { type: 'schedule_trigger', config: { schedule: 'every day at 7am' } },
-      result: { nodeId: `node_${now}_1`, type: 'schedule_trigger', label: 'Schedule', emoji: '[clock]', config: { schedule: 'every day at 7am' }, position: { x: 300, y: baseY } },
+      result: { nodeId: `node_${now}_1`, type: 'schedule_trigger', label: 'Schedule', emoji: '[clock]', config: { schedule: 'every day at 7am' }, position: { x: 80, y: 150 } },
       status: 'done',
     },
     {
       id: 'tc_2', name: 'add_node',
       input: { type: 'web_search', config: { query: 'top news today' } },
-      result: { nodeId: `node_${now}_2`, type: 'web_search', label: 'Web Search', emoji: '[search]', config: { query: 'top news today' }, position: { x: 300, y: baseY + 150 } },
+      result: { nodeId: `node_${now}_2`, type: 'web_search', label: 'Web Search', emoji: '[search]', config: { query: 'top news today' }, position: { x: 240, y: 150 } },
       status: 'done',
     },
     {
       id: 'tc_3', name: 'add_node',
       input: { type: 'claude_chat', config: { prompt: 'Summarize these news articles into a brief, easy-to-read email newsletter' } },
-      result: { nodeId: `node_${now}_3`, type: 'claude_chat', label: 'Claude AI', emoji: '[brain]', config: { prompt: 'Summarize these news articles into a brief, easy-to-read newsletter' }, position: { x: 300, y: baseY + 300 } },
+      result: { nodeId: `node_${now}_3`, type: 'claude_chat', label: 'Claude AI', emoji: '[brain]', config: { prompt: 'Summarize these news articles into a brief, easy-to-read newsletter' }, position: { x: 400, y: 150 } },
       status: 'done',
     },
     {
       id: 'tc_4', name: 'add_node',
       input: { type: 'send_email', config: { subject: '[news] Your Daily News Summary', to: 'you@example.com' } },
-      result: { nodeId: `node_${now}_4`, type: 'send_email', label: 'Send Email', emoji: '[email]', config: { subject: '[news] Your Daily News Summary', to: 'you@example.com' }, position: { x: 300, y: baseY + 450 } },
+      result: { nodeId: `node_${now}_4`, type: 'send_email', label: 'Send Email', emoji: '[email]', config: { subject: '[news] Your Daily News Summary', to: 'you@example.com' }, position: { x: 560, y: 150 } },
       status: 'done',
     },
   ];
@@ -1123,19 +1124,19 @@ function buildSocialPostWorkflow(existingNodes: any[]) {
     {
       id: 'tc_1', name: 'add_node',
       input: { type: 'schedule_trigger', config: { schedule: 'every day at 9am' } },
-      result: { nodeId: `node_${now}_1`, type: 'schedule_trigger', label: 'Schedule', emoji: '[clock]', config: { schedule: 'every day at 9am' }, position: { x: 300, y: baseY } },
+      result: { nodeId: `node_${now}_1`, type: 'schedule_trigger', label: 'Schedule', emoji: '[clock]', config: { schedule: 'every day at 9am' }, position: { x: 80, y: 150 } },
       status: 'done',
     },
     {
       id: 'tc_2', name: 'add_node',
       input: { type: 'claude_chat', config: { prompt: 'Generate an inspiring motivational quote with a relevant emoji. Keep it under 280 characters.' } },
-      result: { nodeId: `node_${now}_2`, type: 'claude_chat', label: 'Claude AI', emoji: '[brain]', config: { prompt: 'Generate an inspiring motivational quote. Keep it under 280 characters.' }, position: { x: 300, y: baseY + 150 } },
+      result: { nodeId: `node_${now}_2`, type: 'claude_chat', label: 'Claude AI', emoji: '[brain]', config: { prompt: 'Generate an inspiring motivational quote. Keep it under 280 characters.' }, position: { x: 240, y: 150 } },
       status: 'done',
     },
     {
       id: 'tc_3', name: 'add_node',
       input: { type: 'post_x', config: {} },
-      result: { nodeId: `node_${now}_3`, type: 'post_x', label: 'Post to X', emoji: '[bird]', config: {}, position: { x: 300, y: baseY + 300 } },
+      result: { nodeId: `node_${now}_3`, type: 'post_x', label: 'Post to X', emoji: '[bird]', config: {}, position: { x: 400, y: 150 } },
       status: 'done',
     },
   ];
@@ -1159,25 +1160,25 @@ function buildWebMonitorWorkflow(existingNodes: any[]) {
     {
       id: 'tc_1', name: 'add_node',
       input: { type: 'schedule_trigger', config: { schedule: 'every hour' } },
-      result: { nodeId: `node_${now}_1`, type: 'schedule_trigger', label: 'Schedule', emoji: '[clock]', config: { schedule: 'every hour' }, position: { x: 300, y: baseY } },
+      result: { nodeId: `node_${now}_1`, type: 'schedule_trigger', label: 'Schedule', emoji: '[clock]', config: { schedule: 'every hour' }, position: { x: 80, y: 150 } },
       status: 'done',
     },
     {
       id: 'tc_2', name: 'add_node',
       input: { type: 'web_scraper', config: { url: 'https://example.com' } },
-      result: { nodeId: `node_${now}_2`, type: 'web_scraper', label: 'Web Scraper', emoji: '[spider]', config: { url: 'https://example.com' }, position: { x: 300, y: baseY + 150 } },
+      result: { nodeId: `node_${now}_2`, type: 'web_scraper', label: 'Web Scraper', emoji: '[spider]', config: { url: 'https://example.com' }, position: { x: 240, y: 150 } },
       status: 'done',
     },
     {
       id: 'tc_3', name: 'add_node',
       input: { type: 'if_else', config: { condition: 'content has changed since last check' } },
-      result: { nodeId: `node_${now}_3`, type: 'if_else', label: 'If/Else', emoji: '[branch]', config: { condition: 'content has changed' }, position: { x: 300, y: baseY + 300 } },
+      result: { nodeId: `node_${now}_3`, type: 'if_else', label: 'If/Else', emoji: '[branch]', config: { condition: 'content has changed' }, position: { x: 400, y: 150 } },
       status: 'done',
     },
     {
       id: 'tc_4', name: 'add_node',
       input: { type: 'send_telegram', config: { message: '[alert] Website changed! Check it out.' } },
-      result: { nodeId: `node_${now}_4`, type: 'send_telegram', label: 'Send Telegram', emoji: '[send]', config: { message: '[alert] Website changed!' }, position: { x: 300, y: baseY + 450 } },
+      result: { nodeId: `node_${now}_4`, type: 'send_telegram', label: 'Send Telegram', emoji: '[send]', config: { message: '[alert] Website changed!' }, position: { x: 560, y: 150 } },
       status: 'done',
     },
   ];
@@ -1223,43 +1224,43 @@ function buildScriptToVideoWorkflow(existingNodes: any[]) {
     {
       id: 'tc_1', name: 'add_node',
       input: { type: 'script_parser', config: { format: 'auto' } },
-      result: { nodeId: `node_${now}_1`, type: 'script_parser', label: 'Script Parser', emoji: '[scroll]', config: { format: 'auto' }, position: { x: 300, y: baseY } },
+      result: { nodeId: `node_${now}_1`, type: 'script_parser', label: 'Script Parser', emoji: '[scroll]', config: { format: 'auto' }, position: { x: 80, y: 150 } },
       status: 'done',
     },
     {
       id: 'tc_2', name: 'add_node',
       input: { type: 'element_reference', config: { model: 'flux-pro' } },
-      result: { nodeId: `node_${now}_2`, type: 'element_reference', label: 'Element Reference', emoji: '[masks]', config: { model: 'flux-pro' }, position: { x: 300, y: baseY + 150 } },
+      result: { nodeId: `node_${now}_2`, type: 'element_reference', label: 'Element Reference', emoji: '[masks]', config: { model: 'flux-pro' }, position: { x: 240, y: 150 } },
       status: 'done',
     },
     {
       id: 'tc_3', name: 'add_node',
       input: { type: 'photo_generator', config: { model: 'flux-pro', width: 1920, height: 1080 } },
-      result: { nodeId: `node_${now}_3`, type: 'photo_generator', label: 'Photo Generator', emoji: '[photo]', config: { model: 'flux-pro', width: 1920, height: 1080 }, position: { x: 300, y: baseY + 300 } },
+      result: { nodeId: `node_${now}_3`, type: 'photo_generator', label: 'Photo Generator', emoji: '[photo]', config: { model: 'flux-pro', width: 1920, height: 1080 }, position: { x: 400, y: 150 } },
       status: 'done',
     },
     {
       id: 'tc_4', name: 'add_node',
       input: { type: 'video_generator', config: { model: 'kling', duration: 4 } },
-      result: { nodeId: `node_${now}_4`, type: 'video_generator', label: 'Video Generator', emoji: '[video]', config: { model: 'kling', duration: 4 }, position: { x: 300, y: baseY + 450 } },
+      result: { nodeId: `node_${now}_4`, type: 'video_generator', label: 'Video Generator', emoji: '[video]', config: { model: 'kling', duration: 4 }, position: { x: 560, y: 150 } },
       status: 'done',
     },
     {
       id: 'tc_5', name: 'add_node',
       input: { type: 'voiceover_generator', config: { model: 'elevenlabs', voice: 'adam' } },
-      result: { nodeId: `node_${now}_5`, type: 'voiceover_generator', label: 'Voiceover Generator', emoji: '[voice]', config: { model: 'elevenlabs', voice: 'adam' }, position: { x: 300, y: baseY + 600 } },
+      result: { nodeId: `node_${now}_5`, type: 'voiceover_generator', label: 'Voiceover Generator', emoji: '[voice]', config: { model: 'elevenlabs', voice: 'adam' }, position: { x: 720, y: 150 } },
       status: 'done',
     },
     {
       id: 'tc_6', name: 'add_node',
       input: { type: 'project_orchestrator', config: { projectName: 'My Video Project', photoModel: 'flux-pro', videoModel: 'kling', voiceModel: 'elevenlabs' } },
-      result: { nodeId: `node_${now}_6`, type: 'project_orchestrator', label: 'Project Orchestrator', emoji: '[target]', config: { projectName: 'My Video Project', photoModel: 'flux-pro', videoModel: 'kling', voiceModel: 'elevenlabs' }, position: { x: 300, y: baseY + 750 } },
+      result: { nodeId: `node_${now}_6`, type: 'project_orchestrator', label: 'Project Orchestrator', emoji: '[target]', config: { projectName: 'My Video Project', photoModel: 'flux-pro', videoModel: 'kling', voiceModel: 'elevenlabs' }, position: { x: 880, y: 150 } },
       status: 'done',
     },
     {
       id: 'tc_6b', name: 'add_node',
       input: { type: 'final_video_compiler', config: { transition: 'fade', outputResolution: '1920x1080', outputFormat: 'mp4', addCaptions: 'no', mode: 'cloudinary' } },
-      result: { nodeId: `node_${now}_7`, type: 'final_video_compiler', label: 'Final Video Compiler', emoji: '[film]', config: { transition: 'fade', outputResolution: '1920x1080', outputFormat: 'mp4', addCaptions: 'no', mode: 'cloudinary' }, position: { x: 300, y: baseY + 900 } },
+      result: { nodeId: `node_${now}_7`, type: 'final_video_compiler', label: 'Final Video Compiler', emoji: '[film]', config: { transition: 'fade', outputResolution: '1920x1080', outputFormat: 'mp4', addCaptions: 'no', mode: 'cloudinary' }, position: { x: 1040, y: 150 } },
       status: 'done',
     },
     // Connect all nodes
@@ -1291,13 +1292,13 @@ function buildGenericWorkflow(message: string, existingNodes: any[]) {
     {
       id: 'tc_1', name: 'add_node',
       input: { type: 'manual_trigger', config: {} },
-      result: { nodeId: `node_${now}_1`, type: 'manual_trigger', label: 'Manual Trigger', emoji: '[click]', config: {}, position: { x: 300, y: 80 } },
+      result: { nodeId: `node_${now}_1`, type: 'manual_trigger', label: 'Manual Trigger', emoji: '[click]', config: {}, position: { x: 80, y: 150 } },
       status: 'done',
     },
     {
       id: 'tc_2', name: 'add_node',
       input: { type: 'claude_chat', config: { prompt: message } },
-      result: { nodeId: `node_${now}_2`, type: 'claude_chat', label: 'Claude AI', emoji: '[brain]', config: { prompt: message }, position: { x: 300, y: 230 } },
+      result: { nodeId: `node_${now}_2`, type: 'claude_chat', label: 'Claude AI', emoji: '[brain]', config: { prompt: message }, position: { x: 240, y: 150 } },
       status: 'done',
     },
   ];

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireUser } from '@/lib/supabase-server';
 import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@supabase/supabase-js';
 import { BUILDER_TOOLS, getNodeMeta, type NodeType } from '@/lib/types';
@@ -226,6 +227,9 @@ ALWAYS end with:
 Keep responses focused and conversational. You're a brainstorming partner, not a builder.`;
 
 export async function POST(req: NextRequest) {
+  const { unauthorized } = await requireUser();
+  if (unauthorized) return unauthorized;
+
   try {
     const body = await req.json();
     const { message, history, nodes, edges, mode } = body;

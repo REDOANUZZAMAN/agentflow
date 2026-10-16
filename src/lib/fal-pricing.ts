@@ -25,9 +25,6 @@ export const FAL_PRICING: Record<string, number> = {
   'fal-ai/elevenlabs/text-to-dialogue/eleven-v3':   0.050,
   'fal-ai/elevenlabs/music':                        0.100,  // per ~30s
 
-  // Cloudinary — free tier, tracked as 0 for now
-  'cloudinary-upload': 0,
-  'cloudinary-splice': 0,
 };
 
 /**
@@ -71,61 +68,57 @@ export function calculateCost(model: string, params?: {
   return basePrice;
 }
 
+// Used when a model has no price in FAL_PRICING, so an unknown model never counts as free
+const FALLBACK_PRICE = { image: 0.08, videoPerSecond: 0.3, audio: 0.05 };
+
+/** Cost of one node, with a safe upper fallback for unknown models. */
+export function estimateNodeCost(node: { data: { type: string; config: Record<string, any> } }): number {
+  const t = node.data.type;
+  const config = node.data.config || {};
+  if (['photo_generator', 'element_reference', 'image_gen'].includes(t)) {
+    const model = config.model || 'fal-ai/nano-banana-2';
+    return FAL_PRICING[model] !== undefined ? calculateCost(model, { numImages: 1, resolution: config.resolution }) : FALLBACK_PRICE.image;
+  }
+  if (['video_generator', 'video_gen'].includes(t)) {
+    const model = config.model || 'fal-ai/kling-video/o3/pro/image-to-video';
+    const seconds = Number(config.duration) || 5;
+    return FAL_PRICING[model] !== undefined ? calculateCost(model, { durationSeconds: seconds }) : FALLBACK_PRICE.videoPerSecond * seconds;
+  }
+  if (['voiceover_generator', 'voice_gen'].includes(t)) {
+    const model = config.model || 'fal-ai/elevenlabs/tts/turbo-v2.5';
+    return FAL_PRICING[model] ?? FALLBACK_PRICE.audio;
+  }
+  return 0;
+}
+
 /**
  * Estimate the total cost of a workflow before running it.
+ * Priced per node, so shots with different video lengths are counted correctly.
  */
 export function estimateWorkflowCost(nodes: Array<{ data: { type: string; config: Record<string, any> } }>): {
   total: number;
   breakdown: { type: string; count: number; unitCost: number; subtotal: number }[];
 } {
-  const breakdown: { type: string; count: number; unitCost: number; subtotal: number }[] = [];
+  const groups = new Map<string, { count: number; subtotal: number }>();
   let total = 0;
-
-  // Count by type
-  const typeCount = new Map<string, { count: number; model: string; duration?: number }>();
-
   for (const node of nodes) {
+    const cost = estimateNodeCost(node);
+    if (cost <= 0) continue;
     const t = node.data.type;
-    const config = node.data.config || {};
-
-    if (['photo_generator', 'element_reference', 'image_gen'].includes(t)) {
-      const model = config.model || 'fal-ai/nano-banana-2';
-      const key = `image:${model}`;
-      const existing = typeCount.get(key) || { count: 0, model };
-      existing.count++;
-      typeCount.set(key, existing);
-    } else if (['video_generator', 'video_gen'].includes(t)) {
-      const model = config.model || 'fal-ai/kling-video/o3/pro/image-to-video';
-      const duration = config.duration || 5;
-      const key = `video:${model}`;
-      const existing = typeCount.get(key) || { count: 0, model, duration };
-      existing.count++;
-      typeCount.set(key, existing);
-    } else if (['voiceover_generator', 'voice_gen'].includes(t)) {
-      const model = config.model || 'fal-ai/elevenlabs/tts/turbo-v2.5';
-      const key = `audio:${model}`;
-      const existing = typeCount.get(key) || { count: 0, model };
-      existing.count++;
-      typeCount.set(key, existing);
-    }
+    const kind = ['video_generator', 'video_gen'].includes(t) ? 'video' : ['voiceover_generator', 'voice_gen'].includes(t) ? 'audio' : 'image';
+    const g = groups.get(kind) || { count: 0, subtotal: 0 };
+    g.count++;
+    g.subtotal += cost;
+    groups.set(kind, g);
+    total += cost;
   }
-
-  for (const [key, { count, model, duration }] of typeCount) {
-    const unitCost = calculateCost(model, { durationSeconds: duration, numImages: 1 });
-    const subtotal = unitCost * count;
-    total += subtotal;
-    breakdown.push({
-      type: key.split(':')[0],
-      count,
-      unitCost,
-      subtotal,
-    });
-  }
-
-  return {
-    total: Math.round(total * 100) / 100,
-    breakdown,
-  };
+  const breakdown = [...groups].map(([type, g]) => ({
+    type,
+    count: g.count,
+    unitCost: Math.round((g.subtotal / g.count) * 1000) / 1000,
+    subtotal: Math.round(g.subtotal * 1000) / 1000,
+  }));
+  return { total: Math.round(total * 100) / 100, breakdown };
 }
 
 // Default cost cap per workflow run (USD)

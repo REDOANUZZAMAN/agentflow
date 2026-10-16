@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server';
+import { requireUser } from '@/lib/supabase-server';
 import { BUILDER_TOOLS, getNodeMeta, type NodeType } from '@/lib/types';
 
 // BATCHING prompt — Claude makes ALL tool calls without task bookkeeping.
@@ -297,6 +298,9 @@ ALWAYS end with:
 - Write voiceover text shorter than 83% of the shot duration`;
 
 export async function POST(req: NextRequest) {
+  const { unauthorized } = await requireUser();
+  if (unauthorized) return unauthorized;
+
   const body = await req.json();
   const { message, history, nodes, edges, mode } = body;
   const isPlanMode = mode === 'plan';
@@ -465,6 +469,17 @@ export async function POST(req: NextRequest) {
           }
         }
 
+        function knownNodeIds(): Set<string> {
+          const ids = new Set<string>((nodes || []).map((n: any) => n.id));
+          for (const c of allToolCalls) {
+            if (c.name === 'add_node' && c.result?.nodeId && !c.result.rejected && !c.result.duplicate) ids.add(c.result.nodeId);
+          }
+          for (const c of allToolCalls) {
+            if (c.name === 'delete_node' && c.result?.success) ids.delete(nodeIdMap[c.input?.node_id] || c.input?.node_id);
+          }
+          return ids;
+        }
+
         function processToolBlock(block: any) {
           const inp = block.input as Record<string, unknown>;
           let result: any = {};
@@ -513,7 +528,22 @@ export async function POST(req: NextRequest) {
               }
               break;
             }
-            case 'connect_nodes': result = { from: inp.from_node_id, to: inp.to_node_id, success: true }; break;
+            case 'connect_nodes': {
+              // Accept either the returned nodeId or the add_node tool_use id, and refuse ids that don't exist,
+              // so the model gets a real error to fix instead of a silent "success" that draws nothing.
+              const known = knownNodeIds();
+              const from = nodeIdMap[inp.from_node_id as string] || (inp.from_node_id as string);
+              const to = nodeIdMap[inp.to_node_id as string] || (inp.to_node_id as string);
+              const missing = [from, to].filter(id => !known.has(id));
+              if (missing.length > 0) {
+                result = { error: `Unknown node id(s): ${missing.join(', ')}. Use the nodeId values returned by add_node. Valid ids: ${[...known].join(', ')}`, success: false };
+                const processed = { id: block.id, name: block.name, input: inp, result, status: 'error' };
+                allToolCalls.push(processed);
+                return processed;
+              }
+              result = { from, to, success: true };
+              break;
+            }
             case 'update_node': result = { nodeId: inp.node_id, config: inp.config, label: inp.label, success: true }; break;
             case 'delete_node': result = { nodeId: inp.node_id, success: true }; break;
             case 'run_workflow': result = { success: true }; break;
@@ -733,6 +763,15 @@ export async function POST(req: NextRequest) {
           currentMessages = [...currentMessages, { role: 'assistant', content: data.content }, { role: 'user', content: toolResults }];
         }
 
+        // Safety net: wire up any node the model left without connections
+        const repairs = findMissingConnections(nodes || [], edges || [], allToolCalls, nodeIdMap);
+        for (const [from, to] of repairs) {
+          const processed = { id: `auto_conn_${from}_${to}`, name: 'connect_nodes', input: { from_node_id: from, to_node_id: to }, result: { from, to, success: true, auto: true }, status: 'done' };
+          allToolCalls.push(processed);
+          send('tool', processed);
+        }
+        if (repairs.length > 0) send('status', { phase: 'repairing', message: `Connected ${repairs.length} loose node(s)` });
+
         // Auto-complete any remaining tasks that weren't ticked during rounds
         while (taskList.length > 0 && globalTaskIdx < taskList.length) {
           const tid = taskList[globalTaskIdx].id;
@@ -765,4 +804,106 @@ export async function POST(req: NextRequest) {
   return new Response(stream, {
     headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive' },
   });
+}
+
+// ─── Connection repair ──────────────────────────────────────────────
+// Returns [from, to] pairs for nodes the model left disconnected. Follows the same wiring
+// the prompt asks for: trigger → elements → photos → (video, voiceover) per shot → orchestrator → compiler.
+// Anything else falls back to "connect from the node built just before it".
+type LiteNode = { id: string; type: string; scene?: number; shot?: number };
+
+function findMissingConnections(
+  canvasNodes: any[],
+  canvasEdges: any[],
+  toolCalls: any[],
+  nodeIdMap: Record<string, string>,
+): Array<[string, string]> {
+  const deleted = new Set(
+    toolCalls.filter(c => c.name === 'delete_node' && c.result?.success).map(c => nodeIdMap[c.input?.node_id] || c.input?.node_id),
+  );
+  const list: LiteNode[] = [];
+  for (const n of canvasNodes) {
+    if (deleted.has(n.id)) continue;
+    list.push({ id: n.id, type: n.data?.type || '', scene: Number(n.data?.config?.sceneNumber) || undefined, shot: Number(n.data?.config?.shotNumber) || undefined });
+  }
+  for (const c of toolCalls) {
+    if (c.name !== 'add_node' || !c.result?.nodeId || c.result.rejected || c.result.duplicate || deleted.has(c.result.nodeId)) continue;
+    list.push({ id: c.result.nodeId, type: c.result.type, scene: Number(c.result.config?.sceneNumber) || undefined, shot: Number(c.result.config?.shotNumber) || undefined });
+  }
+  if (list.length < 2) return [];
+
+  const ids = new Set(list.map(n => n.id));
+  const edgeSet = new Set<string>();
+  const addEdge = (a: string, b: string) => edgeSet.add(`${a}>${b}`);
+  for (const e of canvasEdges) if (ids.has(e.source) && ids.has(e.target)) addEdge(e.source, e.target);
+  for (const c of toolCalls) {
+    if (c.name === 'connect_nodes' && c.result?.success && ids.has(c.result.from) && ids.has(c.result.to)) addEdge(c.result.from, c.result.to);
+  }
+  const hasIn = (id: string) => [...edgeSet].some(k => k.endsWith(`>${id}`));
+  const hasOut = (id: string) => [...edgeSet].some(k => k.startsWith(`${id}>`));
+
+  const of = (...types: string[]) => list.filter(n => types.includes(n.type));
+  const isTrigger = (n: LiteNode) => n.type.includes('trigger');
+  const sameShot = (a: LiteNode, b: LiteNode) => a.scene !== undefined && a.scene === b.scene && a.shot === b.shot;
+  const trigger = list.find(isTrigger);
+  const photos = of('photo_generator', 'image_gen');
+  const elements = of('element_reference');
+  const orchestrator = of('project_orchestrator')[0];
+  const compiler = of('final_video_compiler')[0];
+
+  const repairs: Array<[string, string]> = [];
+  const link = (from: LiteNode | undefined, to: LiteNode) => {
+    if (!from || from.id === to.id || edgeSet.has(`${from.id}>${to.id}`)) return false;
+    addEdge(from.id, to.id);
+    repairs.push([from.id, to.id]);
+    return true;
+  };
+
+  // 1) every non-trigger node needs at least one input
+  list.forEach((n, i) => {
+    if (isTrigger(n) || hasIn(n.id)) return;
+    switch (n.type) {
+      case 'element_reference':
+      case 'script_parser':
+        link(trigger, n); break;
+      case 'photo_generator':
+      case 'image_gen':
+        if (elements.length > 0) elements.forEach(el => link(el, n));
+        else link(trigger, n);
+        break;
+      case 'video_generator':
+      case 'video_gen':
+      case 'voiceover_generator':
+      case 'voice_gen':
+        link(photos.find(p => sameShot(p, n)) || trigger, n); break;
+      case 'project_orchestrator': {
+        const shotOutputs = of('video_generator', 'video_gen', 'voiceover_generator', 'voice_gen');
+        if (shotOutputs.length > 0) shotOutputs.forEach(s => link(s, n));
+        else link(list[i - 1] || trigger, n);
+        break;
+      }
+      case 'final_video_compiler':
+        link(orchestrator || list[i - 1], n); break;
+      default:
+        link(list.slice(0, i).reverse().find(p => p.id !== n.id) || trigger, n);
+    }
+  });
+
+  // 2) pipeline steps that must feed something further on
+  for (const n of of('video_generator', 'video_gen', 'voiceover_generator', 'voice_gen')) {
+    if (!hasOut(n.id) && orchestrator) link(n, orchestrator);
+  }
+  if (orchestrator && compiler && !hasOut(orchestrator.id)) link(orchestrator, compiler);
+  for (const p of photos) {
+    if (hasOut(p.id)) continue;
+    const next = list.find(v => ['video_generator', 'video_gen'].includes(v.type) && sameShot(p, v));
+    if (next) link(p, next);
+  }
+  // A trigger with nothing after it starts the first non-trigger node
+  if (trigger && !hasOut(trigger.id)) {
+    const first = list.find(n => !isTrigger(n) && ['element_reference', 'script_parser'].includes(n.type)) || list.find(n => !isTrigger(n));
+    if (first) link(trigger, first);
+  }
+
+  return repairs;
 }

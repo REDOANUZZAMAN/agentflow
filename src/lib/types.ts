@@ -157,6 +157,8 @@ export interface ChatMessage {
   buttons?: ChatButton[];
   videoUrl?: string;
   videoLabel?: string;
+  videoPoster?: string;
+  executionId?: string; // run that produced this message — used for the Share link
 }
 
 export interface ChatButton {

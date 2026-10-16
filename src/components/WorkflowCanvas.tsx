@@ -23,7 +23,7 @@ import { useApp } from '@/lib/context';
 import { createNode, createEdge } from '@/lib/store';
 import { getNodeMeta, type NodeType } from '@/lib/types';
 import WorkflowNodeComponent from './WorkflowNode';
-import { NodeIcon, WorkflowIcon } from '@/lib/node-icons';
+import { NodeIcon } from '@/lib/node-icons';
 import { FloatingTaskWidget } from './TaskListCard';
 import CanvasContextMenu, { getCanvasMenuItems, getNodeMenuItems } from './CanvasContextMenu';
 
@@ -303,47 +303,40 @@ function WorkflowCanvasInner() {
 
   return (
     <div className="h-full w-full relative">
-      {/* Header */}
-      <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-4 py-2 bg-[var(--background)]/80 backdrop-blur-sm border-b border-[var(--border)]">
-        <div className="flex items-center gap-2">
-          <WorkflowIcon emoji={state.workflowEmoji} className="w-5 h-5 text-[var(--primary)]" />
-          <h2 className="text-sm font-semibold text-[var(--foreground)]">{state.workflowName}</h2>
-          <span className="text-xs text-[var(--muted-foreground)]">
-            {state.nodes.length} node{state.nodes.length !== 1 ? 's' : ''}
-          </span>
-        </div>
-        <div className="flex items-center gap-1">
-          {/* Undo/Redo buttons */}
-          <button
-            onClick={() => dispatch({ type: 'UNDO' })}
-            disabled={state.history.length === 0}
-            className="p-1.5 rounded-md text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--secondary)] transition-colors disabled:opacity-25 disabled:cursor-not-allowed"
-            title={`Undo (Ctrl+Z) • ${state.history.length} steps`}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 7v6h6" /><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6.69 3L3 13" />
-            </svg>
-          </button>
-          <button
-            onClick={() => dispatch({ type: 'REDO' })}
-            disabled={state.future.length === 0}
-            className="p-1.5 rounded-md text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--secondary)] transition-colors disabled:opacity-25 disabled:cursor-not-allowed"
-            title={`Redo (Ctrl+Shift+Z) • ${state.future.length} steps`}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 7v6h-6" /><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6.69 3L21 13" />
-            </svg>
-          </button>
-
-          <div className="w-px h-4 bg-[var(--border)] mx-1" />
-
-          {state.isRunning && (
-            <div className="flex items-center gap-2 text-xs text-[var(--success)]">
-              <span className="w-2 h-2 rounded-full bg-[var(--success)] animate-pulse" />
-              Running...
-            </div>
-          )}
-        </div>
+      {/* Floating undo / redo */}
+      <div className="absolute top-3 left-3 z-10 flex items-center gap-0.5 p-1 rounded-xl glass shadow-[var(--shadow-md)]">
+        <button
+          onClick={() => dispatch({ type: 'UNDO' })}
+          disabled={state.history.length === 0}
+          className="icon-btn !w-7 !h-7"
+          title={`Undo (Ctrl+Z) • ${state.history.length} steps`}
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 7v6h6" /><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6.69 3L3 13" />
+          </svg>
+        </button>
+        <button
+          onClick={() => dispatch({ type: 'REDO' })}
+          disabled={state.future.length === 0}
+          className="icon-btn !w-7 !h-7"
+          title={`Redo (Ctrl+Shift+Z) • ${state.future.length} steps`}
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 7v6h-6" /><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6.69 3L21 13" />
+          </svg>
+        </button>
+        <div className="w-px h-4 bg-[var(--border-subtle)] mx-1" />
+        <button
+          onClick={() => dispatch({ type: 'AUTO_LAYOUT' })}
+          disabled={state.nodes.length < 2}
+          className="icon-btn !w-auto !h-7 !px-2 gap-1.5 text-[12px] font-medium"
+          title="Tidy up — arrange nodes left to right"
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="3" width="6" height="6" rx="1.5" /><rect x="15" y="3" width="6" height="6" rx="1.5" /><rect x="15" y="15" width="6" height="6" rx="1.5" /><path d="M9 6h6" /><path d="M18 9v6" />
+          </svg>
+          Tidy up
+        </button>
       </div>
 
       {/* Canvas */}
@@ -353,7 +346,7 @@ function WorkflowCanvasInner() {
           ...e,
           style: e.id === selectedEdgeId
             ? { stroke: '#ef4444', strokeWidth: 3, cursor: 'pointer' }
-            : { stroke: '#6366f1', strokeWidth: 2 },
+            : { stroke: 'rgba(167,139,250,0.55)', strokeWidth: 1.75 },
           selected: e.id === selectedEdgeId,
           interactionWidth: 20,
         }))}
@@ -374,16 +367,16 @@ function WorkflowCanvasInner() {
         className="bg-[var(--background)]"
         proOptions={{ hideAttribution: true }}
         connectionLineStyle={{ stroke: '#6366f1', strokeWidth: 2 }}
-        defaultEdgeOptions={{ type: 'default', style: { stroke: '#6366f1', strokeWidth: 2 }, animated: false }}
+        defaultEdgeOptions={{ type: 'default', style: { stroke: 'rgba(167,139,250,0.55)', strokeWidth: 1.75 }, animated: false }}
         connectionLineType={'default' as any}
         deleteKeyCode={null}
         panOnDrag
         selectionKeyCode="Shift"
         edgesFocusable
       >
-        <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#27272a" />
-        <Controls className="!bg-[var(--card)] !border-[var(--border)] !rounded-lg !shadow-lg [&>button]:!bg-[var(--card)] [&>button]:!border-[var(--border)] [&>button]:!text-[var(--foreground)] [&>button:hover]:!bg-[var(--secondary)]" />
-        <MiniMap className="!bg-[var(--card)] !border-[var(--border)] !rounded-lg" nodeColor="#6366f1" maskColor="rgba(0, 0, 0, 0.5)" />
+        <Background variant={BackgroundVariant.Dots} gap={22} size={1.2} color="rgba(167,139,250,0.16)" />
+        <Controls showInteractive={false} />
+        <MiniMap pannable zoomable nodeColor="#8B5CF6" nodeBorderRadius={6} maskColor="rgba(10, 7, 19, 0.7)" style={{ width: 168, height: 112 }} />
       </ReactFlow>
 
       {/* Floating task widget */}
@@ -391,7 +384,7 @@ function WorkflowCanvasInner() {
 
       {/* Edge selected — delete banner */}
       {selectedEdgeId && (
-        <div className="absolute top-14 left-1/2 -translate-x-1/2 z-20 flex items-center gap-3 bg-red-500/10 border border-red-500/30 backdrop-blur-sm rounded-lg px-4 py-2 shadow-lg animate-in fade-in slide-in-from-top-2 duration-200">
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-3 bg-red-500/10 border border-red-500/30 backdrop-blur-sm rounded-lg px-4 py-2 shadow-lg animate-in fade-in slide-in-from-top-2 duration-200">
           <span className="text-xs text-red-300">Connection selected</span>
           <button
             onClick={deleteSelectedEdge}

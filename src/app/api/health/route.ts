@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
+import { requireUser } from '@/lib/supabase-server';
 import { supabase } from '@/lib/supabase';
 import Anthropic from '@anthropic-ai/sdk';
 
 export async function GET() {
+  const { unauthorized } = await requireUser();
+  if (unauthorized) return unauthorized;
+
   const checks: Record<string, { status: string; detail?: string }> = {};
 
   // Check Claude API

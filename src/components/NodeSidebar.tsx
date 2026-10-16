@@ -35,10 +35,10 @@ export default function NodeSidebar({ onDragStart }: NodeSidebarProps) {
   };
 
   return (
-    <div className="flex flex-col h-full bg-[var(--background)]">
+    <div className="flex flex-col h-full bg-[var(--bg-sunken)]">
       {/* Header */}
-      <div className="px-4 py-3 border-b border-[var(--border)]">
-        <h2 className="text-sm font-semibold text-[var(--foreground)] mb-2">Node Library</h2>
+      <div className="px-4 py-3 border-b border-[var(--border-subtle)]">
+        <h2 className="text-[13px] font-semibold text-[var(--foreground)] mb-2">Node Library</h2>
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--muted-foreground)]" />
           <input
@@ -46,7 +46,7 @@ export default function NodeSidebar({ onDragStart }: NodeSidebarProps) {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search nodes..."
-            className="w-full pl-8 pr-3 py-1.5 text-xs bg-[var(--card)] border border-[var(--border)] rounded-lg text-[var(--foreground)] placeholder-[var(--muted-foreground)] outline-none focus:border-[var(--primary)]"
+            className="input-field !py-2 !pl-8 !text-xs"
           />
         </div>
       </div>

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { requireUser } from '@/lib/supabase-server';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -8,13 +9,16 @@ const supabase = createClient(
 
 // GET /api/assets — real data from Supabase
 export async function GET(req: NextRequest) {
+  const { user, unauthorized } = await requireUser();
+  if (unauthorized) return unauthorized;
+
   const { searchParams } = new URL(req.url);
   const workflowId = searchParams.get('workflowId');
   const executionId = searchParams.get('executionId');
   const type = searchParams.get('type');
-  const limit = parseInt(searchParams.get('limit') || '100');
+  const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '100') || 100, 1), 200);
 
-  let query = supabase.from('assets').select('*').order('created_at', { ascending: false }).limit(limit);
+  let query = supabase.from('assets').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(limit);
 
   if (workflowId) query = query.eq('workflow_id', workflowId);
   if (executionId) query = query.eq('execution_id', executionId);
@@ -31,12 +35,15 @@ export async function GET(req: NextRequest) {
 
 // POST /api/assets — create a new asset
 export async function POST(req: NextRequest) {
+  const { user, unauthorized } = await requireUser();
+  if (unauthorized) return unauthorized;
+
   const body = await req.json();
 
   const { data, error } = await supabase.from('assets').insert({
     workflow_id: body.workflow_id || null,
     execution_id: body.execution_id || null,
-    user_id: body.user_id,
+    user_id: user.id,
     type: body.type || 'photo',
     cloudinary_public_id: body.cloudinary_public_id,
     cloudinary_url: body.cloudinary_url,

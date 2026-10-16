@@ -1,13 +1,15 @@
 'use client';
 
+import { useParams } from 'next/navigation';
 import React, { useState, useEffect, useCallback } from 'react';
 import { X, Play, Trash2, Copy, EyeOff, Eye, HelpCircle, StickyNote, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { useApp } from '@/lib/context';
 import { getNodeMeta, type NodeType } from '@/lib/types';
-import { NodeIcon } from '@/lib/node-icons';
+import { NodeIcon, getNodeColor } from '@/lib/node-icons';
 
 export default function NodeConfigPanel() {
   const { state, dispatch } = useApp();
+  const params = useParams();
   const selectedNode = state.nodes.find((n) => n.id === state.selectedNodeId);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ status: 'success' | 'error'; message: string; data?: any } | null>(null);
@@ -31,8 +33,7 @@ export default function NodeConfigPanel() {
         body: JSON.stringify({
           nodes: [selectedNode],
           edges: [],
-          workflowId: null,
-          userId: null,
+          workflowId: params?.workflowId,
         }),
       });
 
@@ -143,10 +144,10 @@ export default function NodeConfigPanel() {
   const configFields = getConfigFields(selectedNode.data.type);
 
   return (
-    <div className="flex flex-col h-full bg-[var(--background)]">
+    <div className="flex flex-col h-full bg-[var(--bg-sunken)]">
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--border)]">
-        <span className="flex items-center justify-center w-9 h-9 rounded-lg bg-[var(--secondary)]"><NodeIcon type={selectedNode.data.type} className="w-5 h-5 text-[var(--foreground)]" /></span>
+        <span className={`flex items-center justify-center w-10 h-10 rounded-xl ring-1 ${getNodeColor(selectedNode.data.type).bg} ${getNodeColor(selectedNode.data.type).ring}`}><NodeIcon type={selectedNode.data.type} className={`w-5 h-5 ${getNodeColor(selectedNode.data.type).icon}`} /></span>
         <div className="flex-1 min-w-0">
           <input
             type="text"
@@ -158,9 +159,10 @@ export default function NodeConfigPanel() {
         </div>
         <button
           onClick={() => dispatch({ type: 'SET_SELECTED_NODE', payload: null })}
-          className="w-6 h-6 rounded-md flex items-center justify-center hover:bg-[var(--secondary)] transition-colors"
+          className="icon-btn !w-7 !h-7"
+          title="Close"
         >
-          <X className="w-3.5 h-3.5 text-[var(--muted-foreground)]" />
+          <X className="w-3.5 h-3.5" />
         </button>
       </div>
 

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireUser } from '@/lib/supabase-server';
 
 /**
  * POST /api/compile — Final Video Compiler
@@ -39,6 +40,9 @@ interface CompileStep {
 }
 
 export async function POST(req: NextRequest) {
+  const { unauthorized } = await requireUser();
+  if (unauthorized) return unauthorized;
+
   const body: CompileRequest = await req.json();
   const {
     projectId,
@@ -181,6 +185,9 @@ export async function POST(req: NextRequest) {
 
 // GET /api/compile?projectId=xxx — check compilation status
 export async function GET(req: NextRequest) {
+  const { unauthorized } = await requireUser();
+  if (unauthorized) return unauthorized;
+
   const { searchParams } = new URL(req.url);
   const projectId = searchParams.get('projectId');
 

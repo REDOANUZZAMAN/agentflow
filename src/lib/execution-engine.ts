@@ -1,12 +1,12 @@
 /**
- * Real Execution Engine — Calls fal.ai, Cloudinary, and other real APIs.
+ * Real Execution Engine — Calls fal.ai and other real APIs; media is stored on the VPS (see local-storage.ts).
  * Each node type has a real executor that produces actual assets.
  */
 
 import { fal } from '@fal-ai/client';
-import { v2 as cloudinary } from 'cloudinary';
+import { saveFromUrl, trimAudio, concatVideos, concatAudio, muxAudio, copyAs, type MediaKind } from './local-storage';
 import { FAL_MODELS, getModelCost, pickImageModel, pickVideoModel } from './fal-models';
-import { calculateCost as calcRealCost } from './fal-pricing';
+import { calculateCost as calcRealCost, estimateNodeCost } from './fal-pricing';
 import { applyDefaults } from './node-defaults';
 import { diagnose, applyTransformation, sleep, RECOVERY_LIMITS, type RecoveryAttempt, type RecoveryContext } from './recovery-agent';
 
@@ -18,6 +18,33 @@ export interface ExecutionContext {
   nodeOutputs: Map<string, any>;
   edges: Array<{ source: string; target: string }>;
   emit: (event: ExecutionEvent) => void;
+  signal?: AbortSignal;
+}
+
+// All files of one run live under wf/<workflowId>/run-<executionId>/, so deleting a
+// workflow can remove its media with a single folder.
+function mediaRoot(ctx: ExecutionContext): string {
+  return `wf/${ctx.projectId}/run-${ctx.executionId}`;
+}
+
+// fal.subscribe that stops waiting when the run is stopped, and asks fal to cancel the job
+// so it is not billed for work nobody will use.
+async function falSubscribe(ctx: ExecutionContext, model: string, options: { input: any }) {
+  if (ctx.signal?.aborted) throw new Error('Stopped by user');
+  let requestId: string | undefined;
+  const onAbort = () => {
+    if (requestId) fal.queue.cancel(model, { requestId }).catch(() => { /* already finished */ });
+  };
+  ctx.signal?.addEventListener('abort', onAbort, { once: true });
+  try {
+    return await fal.subscribe(model, {
+      ...options,
+      abortSignal: ctx.signal,
+      onEnqueue: (id: string) => { requestId = id; },
+    });
+  } finally {
+    ctx.signal?.removeEventListener('abort', onAbort);
+  }
 }
 
 export interface ExecutionEvent {
@@ -46,41 +73,24 @@ function initFal() {
   fal.config({ credentials: key });
 }
 
-// Initialize Cloudinary
-function initCloudinary() {
-  const cloud = process.env.CLOUDINARY_CLOUD_NAME;
-  const apiKey = process.env.CLOUDINARY_API_KEY;
-  const apiSecret = process.env.CLOUDINARY_API_SECRET;
-  if (!cloud || !apiKey || !apiSecret) {
-    throw new Error('Cloudinary credentials not set (CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET)');
-  }
-  cloudinary.config({ cloud_name: cloud, api_key: apiKey, api_secret: apiSecret, secure: true });
-  return cloudinary;
-}
-
-// Upload to Cloudinary — NEVER overwrite, always unique IDs
-async function uploadToCloudinary(
+// Save a generated file to VPS storage — always a new unique file, never overwrites.
+// Returns the same shape the Cloudinary upload used to, so callers keep `cloudinaryId`
+// (now the storage id) and `secure_url` (now our public URL).
+async function uploadToStorage(
   url: string,
   folder: string,
   publicId: string,
-  resourceType: 'image' | 'video' | 'raw' = 'image'
-): Promise<{ secure_url: string; public_id: string; width?: number; height?: number; bytes?: number; duration?: number }> {
-  const cld = initCloudinary();
-  // Append timestamp suffix to guarantee uniqueness even if caller sends same publicId
-  const uniqueId = `${publicId}_${Date.now()}`;
-  const result = await cld.uploader.upload(url, {
-    folder,
-    public_id: uniqueId,
-    resource_type: resourceType,
-    overwrite: false,  // CRITICAL: refuse to overwrite existing files
-  });
+  kind: MediaKind = 'image'
+): Promise<{ secure_url: string; public_id: string; width?: number; height?: number; bytes?: number; duration?: number; thumbnailUrl?: string }> {
+  const file = await saveFromUrl(url, folder, publicId, kind);
   return {
-    secure_url: result.secure_url,
-    public_id: result.public_id,
-    width: result.width,
-    height: result.height,
-    bytes: result.bytes,
-    duration: result.duration,
+    secure_url: file.url,
+    public_id: file.id,
+    width: file.width,
+    height: file.height,
+    bytes: file.bytes,
+    duration: file.duration,
+    thumbnailUrl: file.thumbnailUrl,
   };
 }
 
@@ -118,7 +128,7 @@ async function executeElementReference(node: WorkflowNode, ctx: ExecutionContext
   ctx.emit({ type: 'log', nodeId: node.id, data: { message: `[art] Generating reference for "${elementName}" via ${falModel}...` } });
   ctx.emit({ type: 'api_call', nodeId: node.id, data: { service: 'fal.ai', model: falModel, prompt } });
 
-  const result = await fal.subscribe(falModel, {
+  const result = await falSubscribe(ctx, falModel, {
     input: {
       prompt,
       num_images: 1,
@@ -130,11 +140,11 @@ async function executeElementReference(node: WorkflowNode, ctx: ExecutionContext
   const imageUrl = (result as any).data?.images?.[0]?.url || (result as any).images?.[0]?.url;
   if (!imageUrl) throw new Error(`No image returned from fal.ai for element "${elementName}"`);
 
-  ctx.emit({ type: 'log', nodeId: node.id, data: { message: `[upload] Uploading to Cloudinary...` } });
+  ctx.emit({ type: 'log', nodeId: node.id, data: { message: `[upload] Saving to server storage...` } });
 
-  const cldResult = await uploadToCloudinary(
+  const cldResult = await uploadToStorage(
     imageUrl,
-    `agentflow/${ctx.projectId}/elements`,
+    `${mediaRoot(ctx)}/elements`,
     elementName.toLowerCase().replace(/[^a-z0-9]/g, '_'),
     'image'
   );
@@ -254,7 +264,7 @@ async function executePhotoGenerator(node: WorkflowNode, ctx: ExecutionContext) 
   // Fix 4: Log full request body on error
   let result: any;
   try {
-    result = await fal.subscribe(falModel, { input });
+    result = await falSubscribe(ctx, falModel, { input });
   } catch (err: any) {
     ctx.emit({ type: 'log', nodeId: node.id, data: { 
       message: `[x] fal.ai photo request FAILED. Model: ${falModel}, Input: ${JSON.stringify(input, null, 2)}`,
@@ -267,12 +277,12 @@ async function executePhotoGenerator(node: WorkflowNode, ctx: ExecutionContext) 
   const imageUrl = (result as any).data?.images?.[0]?.url || (result as any).images?.[0]?.url;
   if (!imageUrl) throw new Error('No photo URL returned from fal.ai');
 
-  ctx.emit({ type: 'log', nodeId: node.id, data: { message: `[upload] Uploading photo to Cloudinary (scene-${sceneNum}/shot-${shotNum})...` } });
+  ctx.emit({ type: 'log', nodeId: node.id, data: { message: `[upload] Saving photo to server storage (scene-${sceneNum}/shot-${shotNum})...` } });
 
   // Fix 1: Unique path per scene/shot/execution
-  const cldResult = await uploadToCloudinary(
+  const cldResult = await uploadToStorage(
     imageUrl,
-    `agentflow/${ctx.executionId}/scene-${sceneNum}/shot-${shotNum}`,
+    `${mediaRoot(ctx)}/scene-${sceneNum}/shot-${shotNum}`,
     'photo',
     'image'
   );
@@ -356,7 +366,7 @@ async function executeVideoGenerator(node: WorkflowNode, ctx: ExecutionContext) 
   // Fix 4: Log full request body on error
   let result: any;
   try {
-    result = await fal.subscribe(falModel, { input });
+    result = await falSubscribe(ctx, falModel, { input });
   } catch (err: any) {
     ctx.emit({ type: 'log', nodeId: node.id, data: {
       message: `[x] fal.ai video request FAILED. Model: ${falModel}, Input: ${JSON.stringify(input, null, 2)}`,
@@ -368,12 +378,12 @@ async function executeVideoGenerator(node: WorkflowNode, ctx: ExecutionContext) 
   const videoUrl = (result as any).data?.video?.url || (result as any).video?.url;
   if (!videoUrl) throw new Error('No video URL returned from fal.ai');
 
-  ctx.emit({ type: 'log', nodeId: node.id, data: { message: `[upload] Uploading video to Cloudinary (scene-${sceneNum}/shot-${shotNum})...` } });
+  ctx.emit({ type: 'log', nodeId: node.id, data: { message: `[upload] Saving video to server storage (scene-${sceneNum}/shot-${shotNum})...` } });
 
   // Fix 1: Unique path per execution
-  const cldResult = await uploadToCloudinary(
+  const cldResult = await uploadToStorage(
     videoUrl,
-    `agentflow/${ctx.executionId}/scene-${sceneNum}/shot-${shotNum}`,
+    `${mediaRoot(ctx)}/scene-${sceneNum}/shot-${shotNum}`,
     'video',
     'video'
   );
@@ -384,6 +394,7 @@ async function executeVideoGenerator(node: WorkflowNode, ctx: ExecutionContext) 
     _nodeType: 'video_generator',
     videoUrl: cldResult.secure_url,
     cloudinaryId: cldResult.public_id,
+    thumbnailUrl: cldResult.thumbnailUrl,
     sceneNumber: sceneNum,
     shotNumber: shotNum,
     duration: videoDuration,
@@ -448,7 +459,7 @@ Write ONLY the expanded narration text, nothing else. Target: ~${targetWords} wo
   return originalText;
 }
 
-// Helper: Generate TTS audio and upload to Cloudinary, returns { audioUrl, cloudinaryId, duration }
+// Helper: Generate TTS audio and save it to storage, returns { audioUrl, cloudinaryId (storage id), duration }
 async function generateAndUploadTTS(
   text: string,
   voice: string | undefined,
@@ -472,7 +483,7 @@ async function generateAndUploadTTS(
 
   ctx.emit({ type: 'api_call', nodeId, data: { service: 'fal.ai', model: falModel, input } });
 
-  const result = await fal.subscribe(falModel, { input });
+  const result = await falSubscribe(ctx, falModel, { input });
   const resultData = (result as any).data || result;
 
   // Extract audio URL from response
@@ -489,12 +500,12 @@ async function generateAndUploadTTS(
     throw new Error(`No audio URL in fal.ai response. Keys: ${Object.keys(resultData).join(', ')}`);
   }
 
-  // Upload to Cloudinary to get actual duration
-  const cldResult = await uploadToCloudinary(
+  // Save locally; ffprobe gives the real duration
+  const cldResult = await uploadToStorage(
     audioUrl,
-    `agentflow/${ctx.executionId}/audio`,
+    `${mediaRoot(ctx)}/audio`,
     `voiceover_${Date.now()}`,
-    'video',
+    'audio',
   );
 
   return {
@@ -574,31 +585,21 @@ async function executeVoiceoverGenerator(node: WorkflowNode, ctx: ExecutionConte
         continue; // Retry with expanded text
       }
 
-      // ── Check: Audio too LONG? → Trim with Cloudinary ──
+      // ── Check: Audio too LONG? → Trim with ffmpeg ──
       if (ttsResult.duration > maxDuration) {
         ctx.emit({ type: 'log', nodeId: node.id, data: {
           message: `[cut] Audio too long (${ttsResult.duration.toFixed(1)}s > ${maxDuration}s). Trimming to ${maxDuration}s...`,
         }});
 
         try {
-          const cld = initCloudinary();
-          const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
-          // Cloudinary du_ sets max duration (trims the end)
-          const trimUrl = `https://res.cloudinary.com/${cloudName}/video/upload/du_${maxDuration.toFixed(1)}/${ttsResult.cloudinaryId}.mp3`;
-          const trimResult = await cld.uploader.upload(trimUrl, {
-            folder: `agentflow/${ctx.executionId}/audio`,
-            public_id: `voiceover_trimmed_${Date.now()}`,
-            resource_type: 'video',
-            overwrite: false,
-          });
-
+          const trimmed = await trimAudio(ttsResult.cloudinaryId, maxDuration, `${mediaRoot(ctx)}/audio`);
           bestResult = {
-            audioUrl: trimResult.secure_url,
-            cloudinaryId: trimResult.public_id,
-            duration: Math.min(ttsResult.duration, maxDuration),
+            audioUrl: trimmed.url,
+            cloudinaryId: trimmed.id,
+            duration: Math.min(trimmed.duration ?? ttsResult.duration, maxDuration),
           };
           ctx.emit({ type: 'log', nodeId: node.id, data: {
-            message: `[ok] Trimmed to ${maxDuration}s: ${trimResult.secure_url}`,
+            message: `[ok] Trimmed to ${maxDuration}s: ${trimmed.url}`,
           }});
         } catch (trimErr: any) {
           ctx.emit({ type: 'log', nodeId: node.id, data: {
@@ -650,14 +651,14 @@ async function executeImageGen(node: WorkflowNode, ctx: ExecutionContext) {
 
   ctx.emit({ type: 'log', nodeId: node.id, data: { message: `[image] Generating image via ${falModel}...` } });
 
-  const result = await fal.subscribe(falModel, {
+  const result = await falSubscribe(ctx, falModel, {
     input: { prompt: prompt || 'A beautiful image', num_images: 1, image_size: 'landscape_16_9' },
   });
 
   const imageUrl = (result as any).data?.images?.[0]?.url || (result as any).images?.[0]?.url;
   if (!imageUrl) throw new Error('No image URL returned');
 
-  const cldResult = await uploadToCloudinary(imageUrl, `agentflow/${ctx.projectId}/images`, `img_${Date.now()}`, 'image');
+  const cldResult = await uploadToStorage(imageUrl, `${mediaRoot(ctx)}/images`, `img_${Date.now()}`, 'image');
   ctx.emit({ type: 'asset_created', nodeId: node.id, data: { type: 'image', url: cldResult.secure_url } });
 
   return { _nodeType: 'image_gen', imageUrl: cldResult.secure_url, cloudinaryId: cldResult.public_id, model: falModel, cost: calcRealCost(falModel, { numImages: 1 }) };
@@ -745,36 +746,23 @@ async function executeFinalVideoCompiler(node: WorkflowNode, ctx: ExecutionConte
     message: `[video] Found ${videos.length} video clips + ${voiceovers.length} voiceover tracks` 
   }});
 
-  const cld = initCloudinary();
-  const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
-  const folder = `workflows/${ctx.projectId}/run-${ctx.executionId}`;
+  const folder = `${mediaRoot(ctx)}/final`;
 
-  // ── Step 1: Splice video clips together ────────────────────────
+  // ── Step 1: Join video clips in scene+shot order (ffmpeg) ──────
   let splicedVideoId: string | null = null;
   let splicedVideoUrl: string;
-  
+
   const videoIds = videos.map(v => v.cloudinaryId).filter(Boolean);
-  
+
   if (videoIds.length >= 2) {
     try {
-      ctx.emit({ type: 'log', nodeId: node.id, data: { message: `[link] Splicing ${videoIds.length} clips...` } });
-      
-      const baseId = videoIds[0];
-      const spliceOverlays = videoIds.slice(1).map(id => `fl_splice,l_video:${id.replace(/\//g, ':')}`).join('/');
-      const spliceUrl = `https://res.cloudinary.com/${cloudName}/video/upload/${spliceOverlays}/${baseId}.mp4`;
-      
-      const spliceResult = await cld.uploader.upload(spliceUrl, {
-        folder,
-        public_id: 'spliced_video',
-        resource_type: 'video',
-        overwrite: true,
-      });
-      
-      splicedVideoId = spliceResult.public_id;
-      splicedVideoUrl = spliceResult.secure_url;
-      ctx.emit({ type: 'log', nodeId: node.id, data: { message: `[ok] Video clips spliced: ${splicedVideoUrl}` } });
+      ctx.emit({ type: 'log', nodeId: node.id, data: { message: `[link] Joining ${videoIds.length} clips...` } });
+      const spliced = await concatVideos(videoIds, folder);
+      splicedVideoId = spliced.id;
+      splicedVideoUrl = spliced.url;
+      ctx.emit({ type: 'log', nodeId: node.id, data: { message: `[ok] Video clips joined (${spliced.duration?.toFixed(1) || '?'}s): ${splicedVideoUrl}` } });
     } catch (err: any) {
-      ctx.emit({ type: 'log', nodeId: node.id, data: { message: `[warn] Splice failed: ${err.message}. Using first clip.` } });
+      ctx.emit({ type: 'log', nodeId: node.id, data: { message: `[warn] Join failed: ${err.message}. Using first clip.` } });
       splicedVideoUrl = videos[0].videoUrl;
       splicedVideoId = videos[0].cloudinaryId;
     }
@@ -783,109 +771,68 @@ async function executeFinalVideoCompiler(node: WorkflowNode, ctx: ExecutionConte
     splicedVideoId = videos[0].cloudinaryId;
   }
 
-  // ── Step 2: Concatenate all voiceovers → single audio → overlay on video ──
-  // Cloudinary multi-overlay with so_ offsets is unreliable (only first plays).
-  // Instead: splice all voiceovers into one continuous track, then overlay once.
+  // ── Step 2: Join voiceovers into one track → put it on the video ──
+  // Each voiceover is padded to its own shot's length so narration stays on its shot.
   let finalUrl = splicedVideoUrl;
   let finalPublicId = splicedVideoId;
 
   if (voiceovers.length > 0 && splicedVideoId) {
     try {
-      // Sort voiceovers by scene+shot to match video order
       const sortedVoiceovers = [...voiceovers].sort((a, b) => {
         const sa = (a.sceneNumber || 1) * 1000 + (a.shotNumber || 0);
         const sb = (b.sceneNumber || 1) * 1000 + (b.shotNumber || 0);
         return sa - sb;
       });
 
-      const voiceIds = sortedVoiceovers.map(v => v.cloudinaryId).filter(Boolean);
-
-      ctx.emit({ type: 'log', nodeId: node.id, data: { 
-        message: `[sound] Combining ${voiceIds.length} voiceover tracks in scene+shot order...` 
+      ctx.emit({ type: 'log', nodeId: node.id, data: {
+        message: `[sound] Combining ${sortedVoiceovers.length} voiceover tracks in scene+shot order...`
       }});
 
-      // Log each voiceover's duration for debugging
       for (const v of sortedVoiceovers) {
-        ctx.emit({ type: 'log', nodeId: node.id, data: { 
-          message: `  → Scene ${v.sceneNumber} Shot ${v.shotNumber}: ${v.audioDuration?.toFixed(1) || '?'}s audio (target: ${v.targetDuration || '?'}s)` 
+        ctx.emit({ type: 'log', nodeId: node.id, data: {
+          message: `  → Scene ${v.sceneNumber} Shot ${v.shotNumber}: ${v.audioDuration?.toFixed(1) || '?'}s audio (target: ${v.targetDuration || '?'}s)`
         }});
       }
 
       let audioId: string | null = null;
-
-      if (voiceIds.length >= 2) {
-        // Splice all voiceover audio tracks together in order
-        const baseAudio = voiceIds[0];
-        const spliceChain = voiceIds.slice(1)
-          .map((id: string) => `fl_splice,l_video:${id.replace(/\//g, ':')}`)
-          .join('/');
-        const audioSpliceUrl = `https://res.cloudinary.com/${cloudName}/video/upload/${spliceChain}/${baseAudio}.mp3`;
-
-        ctx.emit({ type: 'log', nodeId: node.id, data: { 
-          message: `[link] Splicing ${voiceIds.length} audio tracks...` 
+      if (sortedVoiceovers.length >= 2 || videos.length >= 2) {
+        // Slot = the matching shot's clip length, so each line starts with its shot
+        const slots = sortedVoiceovers.map(v =>
+          videos.find(c => c.sceneNumber === v.sceneNumber && c.shotNumber === v.shotNumber)?.duration || v.targetDuration);
+        const joined = await concatAudio(sortedVoiceovers.map(v => v.cloudinaryId), folder, slots);
+        audioId = joined.id;
+        ctx.emit({ type: 'log', nodeId: node.id, data: {
+          message: `[ok] Audio tracks joined: ${joined.duration?.toFixed(1) || '?'}s total`
         }});
-
-        const audioResult = await cld.uploader.upload(audioSpliceUrl, {
-          folder,
-          public_id: `spliced_audio_${Date.now()}`,
-          resource_type: 'video',
-          overwrite: false,
-        });
-        audioId = audioResult.public_id;
-
-        ctx.emit({ type: 'log', nodeId: node.id, data: { 
-          message: `[ok] Audio tracks spliced: ${audioResult.duration?.toFixed(1) || '?'}s total (${audioResult.secure_url.substring(0, 80)}...)` 
-        }});
-      } else if (voiceIds.length === 1) {
-        audioId = voiceIds[0];
-        ctx.emit({ type: 'log', nodeId: node.id, data: { 
-          message: `[ok] Single voiceover track — no splicing needed` 
-        }});
+      } else {
+        audioId = sortedVoiceovers[0].cloudinaryId;
+        ctx.emit({ type: 'log', nodeId: node.id, data: { message: `[ok] Single voiceover track — no joining needed` } });
       }
 
-      // Now overlay the combined audio track onto the video
       if (audioId) {
-        ctx.emit({ type: 'log', nodeId: node.id, data: { 
-          message: `[sound] Overlaying combined audio onto video...` 
-        }});
-
-        const audioOverlayId = audioId.replace(/\//g, ':');
-        const videoWithAudioUrl = `https://res.cloudinary.com/${cloudName}/video/upload/l_video:${audioOverlayId}/fl_layer_apply/${splicedVideoId}.mp4`;
-
-        const finalResult = await cld.uploader.upload(videoWithAudioUrl, {
-          folder,
-          public_id: `final_with_audio_${Date.now()}`,
-          resource_type: 'video',
-          overwrite: false,
-        });
-
-        finalUrl = finalResult.secure_url;
-        finalPublicId = finalResult.public_id;
-        ctx.emit({ type: 'log', nodeId: node.id, data: { 
-          message: `[ok] Final video WITH audio: ${finalUrl}` 
-        }});
+        ctx.emit({ type: 'log', nodeId: node.id, data: { message: `[sound] Adding combined audio to video...` } });
+        const finalFile = await muxAudio(splicedVideoId, audioId, folder);
+        finalUrl = finalFile.url;
+        finalPublicId = finalFile.id;
+        ctx.emit({ type: 'log', nodeId: node.id, data: { message: `[ok] Final video WITH audio: ${finalUrl}` } });
       }
     } catch (err: any) {
-      ctx.emit({ type: 'log', nodeId: node.id, data: { 
-        message: `[warn] Audio merge failed: ${err.message}. Final video will be silent.` 
+      ctx.emit({ type: 'log', nodeId: node.id, data: {
+        message: `[warn] Audio merge failed: ${err.message}. Final video will be silent.`
       }});
       try {
-        const fallbackResult = await cld.uploader.upload(splicedVideoUrl, {
-          folder, public_id: 'final', resource_type: 'video', overwrite: true,
-        });
-        finalUrl = fallbackResult.secure_url;
-        finalPublicId = fallbackResult.public_id;
+        const fallback = await copyAs(splicedVideoId, folder, 'final', 'video');
+        finalUrl = fallback.url;
+        finalPublicId = fallback.id;
       } catch { /* keep splicedVideoUrl */ }
     }
   } else if (voiceovers.length === 0) {
     ctx.emit({ type: 'log', nodeId: node.id, data: { message: `[info] No voiceover audio — final video will be silent` } });
     if (splicedVideoId) {
       try {
-        const noAudioResult = await cld.uploader.upload(splicedVideoUrl, {
-          folder, public_id: 'final', resource_type: 'video', overwrite: true,
-        });
-        finalUrl = noAudioResult.secure_url;
-        finalPublicId = noAudioResult.public_id;
+        const silent = await copyAs(splicedVideoId, folder, 'final', 'video');
+        finalUrl = silent.url;
+        finalPublicId = silent.id;
       } catch { /* keep existing URL */ }
     }
   }
@@ -1003,8 +950,8 @@ export async function executeWorkflow(
   nodes: WorkflowNode[],
   edges: Array<{ source: string; target: string }>,
   emit: (event: ExecutionEvent) => void,
-  options?: { workflowId?: string; executionId?: string; userId?: string }
-): Promise<{ success: boolean; totalCost: number; assets: any[]; errors: string[] }> {
+  options?: { workflowId?: string; executionId?: string; userId?: string; signal?: AbortSignal; budget?: () => number }
+): Promise<{ success: boolean; totalCost: number; assets: any[]; errors: string[]; stopped?: 'cancelled' | 'budget' }> {
   // Use real IDs from caller when available, fallback to generated ones
   const projectId = options?.workflowId || `proj_${Date.now()}`;
   const executionId = options?.executionId || `exec_${Date.now()}`;
@@ -1015,7 +962,10 @@ export async function executeWorkflow(
     nodeOutputs: new Map(),
     edges,
     emit,
+    signal: options?.signal,
   };
+  const budgetNow = options?.budget ?? (() => Infinity); // re-read before each node
+  let stopped: 'cancelled' | 'budget' | undefined;
 
   // AUTO-FIX: Apply schema defaults to all nodes before execution
   // This catches any empty fields the agent forgot to fill
@@ -1035,6 +985,21 @@ export async function executeWorkflow(
   for (const node of sorted) {
     const nodeType = node.data.type;
     const executor = EXECUTORS[nodeType];
+
+    if (ctx.signal?.aborted) {
+      stopped = 'cancelled';
+      emit({ type: 'log', data: { message: `[stop] Stopped by user — remaining nodes were not run` } });
+      break;
+    }
+    // Stop before a node that would push this run past today's free allowance
+    const nodeEstimate = estimateNodeCost(node);
+    if (nodeEstimate > 0 && totalCost + nodeEstimate > budgetNow() + 1e-9) {
+      stopped = 'budget';
+      const msg = `Daily free limit reached — "${node.data.label}" (~$${nodeEstimate.toFixed(2)}) and the nodes after it were not run.`;
+      errors.push(msg);
+      emit({ type: 'log', data: { message: `[stop] ${msg}` } });
+      break;
+    }
 
     if (!executor) {
       emit({ type: 'log', nodeId: node.id, nodeName: `${node.data.emoji} ${node.data.label}`, data: { message: `[warn] No executor for type "${nodeType}", skipping` } });
@@ -1093,6 +1058,11 @@ export async function executeWorkflow(
 
       } catch (err: any) {
         const errMsg = err.message || String(err);
+        if (ctx.signal?.aborted) {
+          stopped = 'cancelled';
+          emit({ type: 'node_error', nodeId: node.id, nodeName: `${node.data.emoji} ${node.data.label}`, data: { error: 'Stopped by user' }, duration: Date.now() - startTime });
+          break;
+        }
 
         // First failure or subsequent — run recovery agent
         if (attempt < RECOVERY_LIMITS.MAX_ATTEMPTS_PER_NODE) {
@@ -1289,10 +1259,14 @@ export async function executeWorkflow(
     }
   }
 
+  if (ctx.signal?.aborted) stopped = 'cancelled';
+  const success = errors.length === 0 && !stopped;
+
   emit({
     type: 'workflow_done',
     data: {
-      success: errors.length === 0,
+      success,
+      stopped,
       totalCost: Math.round(totalCost * 100) / 100,
       assetCount: allAssets.length,
       nodeCount: sorted.length,
@@ -1300,5 +1274,5 @@ export async function executeWorkflow(
     },
   });
 
-  return { success: errors.length === 0, totalCost, assets: allAssets, errors };
+  return { success, totalCost, assets: allAssets, errors, stopped };
 }

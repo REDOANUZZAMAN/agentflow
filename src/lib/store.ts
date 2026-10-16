@@ -29,7 +29,7 @@ export interface AppState {
   // Inspector
   executionEvents: ExecutionEvent[];
   inspectorOpen: boolean;
-  inspectorTab: 'timeline' | 'network' | 'logs' | 'variables' | 'cost';
+  inspectorTab: 'timeline' | 'network' | 'logs' | 'variables' | 'cost' | 'history';
 
   // Execution
   isRunning: boolean;
@@ -68,18 +68,19 @@ export const initialState: AppState = {
       content: `**Hi! I'm your AI Agent Builder.**\n\nTell me what you want your agent to do, and I'll build it right here on the canvas. You'll see every step as I create it!\n\nHere are some ideas to get started:`,
       timestamp: new Date(),
       buttons: [
-        { label: '[email] Daily news summary by email', action: 'Make me an agent that writes a daily news summary and emails it to me' },
-        { label: '[bird] Auto-post to social media', action: 'Create an agent that generates a motivational quote and posts it to Twitter every morning' },
-        { label: '[joke] Daily joke by email', action: 'Send me a daily joke by email every morning at 8am' },
-        { label: '[search] Web monitor with alerts', action: 'Monitor a website for changes and send me a Telegram message when something changes' },
-        { label: '[video] Script to video', action: 'I have a script with scenes and shots. Build me a pipeline that generates photos, videos, and voiceovers for each shot using fal.ai and organizes everything in Cloudinary.' },
+        // Ideas use only nodes that really run today (photo / video / voiceover pipeline)
+        { label: 'Product ad video', action: 'Create a 3-shot, 15-second product ad video for premium wireless earbuds with a voiceover for each shot, compiled into a final video.' },
+        { label: 'Bedtime story for kids', action: 'Make a 4-shot animated bedtime story video about a little fox who finds a lost star, with a gentle narrator voiceover, compiled into a final video.' },
+        { label: 'Travel promo', action: "Create a 4-shot travel promo video for Cox's Bazar with an inspiring voiceover for each shot, compiled into a final video." },
+        { label: 'Character design images', action: 'Images only, no video: design one character as a character element, then make 4 photos of the same character in different poses.' },
+        { label: 'Script to video', action: 'I have a script with scenes and shots. Build me a pipeline that generates photos, videos, and voiceovers for each shot and compiles the final video.' },
       ],
     },
   ],
   isAiTyping: false,
 
   executionEvents: [],
-  inspectorOpen: true,
+  inspectorOpen: false, // opens on node select / run (see builder page)
   inspectorTab: 'timeline',
 
   isRunning: false,
@@ -419,7 +420,7 @@ export function reducer(state: AppState, action: Action): AppState {
     case 'AUTO_LAYOUT': {
       if (state.nodes.length === 0) return state;
       const layouted = dagreLayout(state.nodes, state.edges);
-      return { ...state, nodes: layouted };
+      return { ...state, ...pushHistory(state), nodes: layouted };
     }
 
     // Chat mode
@@ -493,8 +494,8 @@ export function createEdge(source: string, target: string): WorkflowEdge {
 // ─── Dagre-based auto-layout ─────────────────────────────────
 // Uses dagre to compute optimal graph layout (left-to-right)
 // Handles linear chains, branches, and complex DAGs beautifully
-const NODE_WIDTH = 100;  // matches our n8n-style node width
-const NODE_HEIGHT = 90;  // icon box (64) + gap (6) + label (20)
+const NODE_WIDTH = 140;  // matches WorkflowNode width
+const NODE_HEIGHT = 104; // icon box (68) + gap (8) + label/subtitle (28)
 
 export function dagreLayout(nodes: WorkflowNode[], edges: WorkflowEdge[]): WorkflowNode[] {
   if (nodes.length === 0) return nodes;

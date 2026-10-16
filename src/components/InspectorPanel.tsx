@@ -5,8 +5,9 @@ import {
   Clock, Globe, FileText, Variable, DollarSign,
   ChevronRight, ChevronDown, PanelRightClose, PanelRightOpen,
   CheckCircle2, XCircle, Loader2, ArrowRight, Copy, ExternalLink,
-  Image as ImageIcon, Film, Volume2, Cloud, Brain, Inbox,
+  Image as ImageIcon, Film, Volume2, Cloud, Brain, Inbox, History,
 } from 'lucide-react';
+import RunHistory from './RunHistory';
 import { useApp } from '@/lib/context';
 import type { ExecutionEvent } from '@/lib/types';
 
@@ -16,6 +17,7 @@ const TABS = [
   { id: 'logs' as const, label: 'Logs', icon: FileText },
   { id: 'variables' as const, label: 'Variables', icon: Variable },
   { id: 'cost' as const, label: 'Cost', icon: DollarSign },
+  { id: 'history' as const, label: 'History', icon: History },
 ];
 
 export default function InspectorPanel() {
@@ -42,9 +44,9 @@ export default function InspectorPanel() {
   const totalCost = costEvents.length > 0 ? (costEvents[costEvents.length - 1].data?.totalCost as number || 0) : 0;
 
   return (
-    <div className="flex flex-col h-full bg-[var(--background)] border-l border-[var(--border)]">
+    <div className="flex flex-col h-full bg-[var(--bg-sunken)]">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)]">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-subtle)]">
         <div className="flex items-center gap-2">
           <h2 className="text-sm font-semibold text-[var(--foreground)]">Inspector</h2>
           {state.isRunning && (
@@ -56,14 +58,15 @@ export default function InspectorPanel() {
         </div>
         <button
           onClick={() => dispatch({ type: 'SET_INSPECTOR_OPEN', payload: false })}
-          className="p-1 rounded hover:bg-[var(--secondary)] transition-colors"
+          className="icon-btn !w-7 !h-7"
+          title="Hide inspector"
         >
-          <PanelRightClose className="w-4 h-4 text-[var(--muted-foreground)]" />
+          <PanelRightClose className="w-4 h-4" />
         </button>
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-[var(--border)] overflow-x-auto">
+      <div className="flex gap-1 px-2 py-2 border-b border-[var(--border-subtle)] overflow-x-auto">
         {TABS.map((tab) => {
           const Icon = tab.icon;
           const isActive = inspectorTab === tab.id;
@@ -76,10 +79,10 @@ export default function InspectorPanel() {
             <button
               key={tab.id}
               onClick={() => dispatch({ type: 'SET_INSPECTOR_TAB', payload: tab.id })}
-              className={`flex items-center gap-1.5 px-3 py-2 text-xs whitespace-nowrap transition-colors border-b-2 ${
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
                 isActive
-                  ? 'border-[var(--primary)] text-[var(--primary)]'
-                  : 'border-transparent text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+                  ? 'bg-[var(--accent-glow)] text-[var(--foreground)]'
+                  : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--bg-hover)]'
               }`}
             >
               <Icon className="w-3 h-3" />
@@ -101,6 +104,7 @@ export default function InspectorPanel() {
         {inspectorTab === 'logs' && <LogsView />}
         {inspectorTab === 'variables' && <VariablesView events={executionEvents} />}
         {inspectorTab === 'cost' && <CostView events={executionEvents} />}
+        {inspectorTab === 'history' && <RunHistory />}
       </div>
     </div>
   );

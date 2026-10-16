@@ -26,7 +26,8 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  const { data: { session } } = await supabase.auth.getSession();
+  // getUser() verifies the token with Supabase; getSession() only reads the cookie
+  const { data: { user: session } } = await supabase.auth.getUser();
 
   const protectedPaths = ['/dashboard', '/builder', '/library', '/settings'];
   const authPaths = ['/signin', '/signup'];

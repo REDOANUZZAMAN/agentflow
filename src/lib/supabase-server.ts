@@ -42,3 +42,18 @@ export async function getUser() {
   const { data: { user } } = await supabase.auth.getUser();
   return user;
 }
+
+// For API routes: returns the verified user, or a 401 response to send back.
+// getUser() checks the token with Supabase, unlike getSession() which trusts the cookie.
+export async function requireUser() {
+  try {
+    const user = await getUser();
+    if (user) return { user, unauthorized: null };
+  } catch {
+    // Supabase unreachable or bad cookie — treat as signed out
+  }
+  return {
+    user: null,
+    unauthorized: Response.json({ error: 'Not signed in' }, { status: 401 }),
+  };
+}
